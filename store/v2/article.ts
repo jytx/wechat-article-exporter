@@ -156,3 +156,51 @@ export async function updateArticleFakeid(url: string, fakeid: string): Promise<
       });
   });
 }
+
+/**
+ * 获取公众号的所有文章
+ * @param fakeid 公众号id
+ */
+export async function getAllArticlesByFakeid(fakeid: string): Promise<AppMsgExWithFakeID[]> {
+  return db.article.where('fakeid').equals(fakeid).reverse().sortBy('create_time');
+}
+
+/**
+ * 获取公众号的所有文章（分页）
+ * @param fakeid 公众号id
+ * @param begin 起始位置
+ * @param size 返回数量
+ */
+export async function getArticlesByFakeid(
+  fakeid: string,
+  begin: number,
+  size: number
+): Promise<{
+  total: number;
+  articles: AppMsgExWithFakeID[];
+}> {
+  const articles = await db.article.where('fakeid').equals(fakeid).reverse().sortBy('create_time');
+
+  return {
+    total: articles.length,
+    articles: articles.slice(begin, begin + size),
+  };
+}
+
+/**
+ * 标记文章为已下载
+ * @param key 文章主键 (fakeid:aid)
+ * @param downloadedAt 下载时间
+ */
+export async function markArticleAsDownloaded(key: string, downloadedAt: string): Promise<boolean> {
+  return db.transaction('rw', 'article', async () => {
+    const article = await db.article.get(key);
+    if (article) {
+      article.downloaded = true;
+      article.downloadedAt = downloadedAt;
+      await db.article.put(article);
+      return true;
+    }
+    return false;
+  });
+}

@@ -122,7 +122,13 @@ const columnDefs = ref<ColDef[]>([
     filter: 'agDateColumnFilter',
     filterParams: createDateColumnFilterParams(),
     filterValueGetter: (params: ValueGetterParams) => {
-      return new Date(params.getValue('update_time') * 1000);
+      const value = params.getValue('update_time');
+      if (value && typeof value === 'number' && value > 0) {
+        // 判断是秒级还是毫秒级时间戳（10位是秒，13位是毫秒）
+        const timestamp = value < 10000000000 ? value * 1000 : value;
+        return new Date(timestamp);
+      }
+      return null;
     },
     flex: 1,
     minWidth: 180,

@@ -57,7 +57,14 @@ export function durationToSeconds(duration: string | undefined) {
 
 // 时间戳(单位秒)转日期字符串
 export function formatTimeStamp(timestamp: number) {
-  return dayjs.unix(timestamp).format('YYYY-MM-DD HH:mm:ss');
+  if (!timestamp || typeof timestamp !== 'number' || timestamp <= 0) {
+    return '--';
+  }
+  // 判断是秒级还是毫秒级时间戳（10位是秒，13位是毫秒）
+  const isSeconds = timestamp < 10000000000;
+  return isSeconds
+    ? dayjs.unix(timestamp).format('YYYY-MM-DD HH:mm:ss')
+    : dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss');
 }
 
 // 格式化文章显示类型

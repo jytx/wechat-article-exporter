@@ -115,7 +115,11 @@ async function bizLogin() {
     msg.value = '登录成功';
     loginAccount.value = resp;
 
+    // 关闭弹窗
     closeModal();
+
+    // 跳转到主页
+    await navigateTo('/dashboard/account');
   } catch (e: any) {
     msg.value = e.message;
   } finally {

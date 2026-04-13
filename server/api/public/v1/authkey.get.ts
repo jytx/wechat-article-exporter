@@ -1,4 +1,4 @@
-import { getMpCookie } from '~/server/kv/cookie';
+import { getMpCookie } from '~/server/database/cookie';
 import { getAuthKeyFromRequest } from '~/server/utils/proxy-request';
 
 export default defineEventHandler(async event => {

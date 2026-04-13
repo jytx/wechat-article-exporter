@@ -133,8 +133,20 @@ export class BaseDownloader {
     console.warn(`Attempt ${attempt + 1} failed for ${url} using ${proxy}:`, error);
 
     if (attempt < this.options.maxRetries - 1) {
-      const delay = Math.pow(2, attempt);
-      console.warn('下载失败，延迟', delay, '秒后重试');
+      // 检查是否是 429 错误（限流）
+      const isRateLimitError = error?.message?.includes('429') || error?.message?.includes('Too Many Requests');
+
+      // 429 错误使用更长的延迟：5秒、10秒、20秒
+      // 其他错误使用指数退避：1秒、2秒、4秒
+      let delay: number;
+      if (isRateLimitError) {
+        delay = 5 * Math.pow(2, attempt);
+        console.warn(`遇到限流错误(429)，延迟 ${delay} 秒后重试`);
+      } else {
+        delay = Math.pow(2, attempt);
+        console.warn('下载失败，延迟', delay, '秒后重试');
+      }
+
       await sleep(1000 * delay);
     }
   }
@@ -155,6 +167,25 @@ export class BaseDownloader {
         }
       }
 
+      // 优先使用本地后端代理（避免 CORS 和限流问题）
+      try {
+        const localProxyUrl = `/api/proxy/article-html?url=${encodeURIComponent(url)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+        const localResponse = await Promise.race([
+          fetch(localProxyUrl, {
+            signal: abortController.signal,
+          }),
+          timeout(this.options.timeout),
+        ]) as Response;
+
+        if (localResponse.ok) {
+          const blob = await localResponse.blob();
+          return blob;
+        }
+      } catch (localError) {
+        console.warn('本地代理失败，尝试外部代理:', localError);
+      }
+
+      // 本地代理失败时，使用外部代理
       const Authorization = (preferences.value as Preferences).privateProxyAuthorization || '';
       const proxyUrl = `${proxy}?url=${encodeURIComponent(url)}&headers=${encodeURIComponent(JSON.stringify(headers))}&authorization=${Authorization}`;
       const response = (await Promise.race([

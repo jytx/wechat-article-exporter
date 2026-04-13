@@ -1,5 +1,8 @@
 import dayjs from 'dayjs';
+import { randomUUID } from 'uncrypto';
 import { request } from '#shared/utils/request';
+import { getMpCookie, setMpCookie } from '~/server/database/cookie';
+import { createUser, getUserByUsername, updateUserToken } from '~/server/database/user';
 import { getCookieFromResponse, getCookiesFromRequest } from '~/server/utils/CookieStore';
 import { proxyMpRequest } from '~/server/utils/proxy-request';
 
@@ -28,34 +31,80 @@ export default defineEventHandler(async event => {
     },
     body: payload,
     cookie: cookie,
-    action: 'login', // 有这个标志就会把微信原始响应中的所有 set-cookie 存储在 CookieStore 中，并返回给客户端一个唯一的cookie: auth-key=xxx
+    action: 'login', // 微信登录成功后的特殊处理
   });
 
-  // 从响应中取出唯一的 set-cookie (即上一步 `action=login` 标志所设置的 auth-key=xxx)
-  const authKey = getCookieFromResponse('auth-key', response);
-  if (!authKey) {
+  // 从响应中获取临时的 auth-key
+  const tempAuthKey = getCookieFromResponse('auth-key', response);
+  if (!tempAuthKey) {
     return {
-      err: '登录失败，请稍后重试',
+      err: '登录失败，未获取到认证信息',
     };
   }
 
+  // 使用临时的 auth-key 获取公众号信息
   const { nick_name, head_img } = await request(`/api/web/mp/info`, {
     headers: {
-      Cookie: `auth-key=${authKey}`,
+      Cookie: `auth-key=${tempAuthKey}`,
     },
   });
+
   if (!nick_name) {
     return {
       err: '获取公众号昵称失败，请稍后重试',
     };
   }
 
-  const body = JSON.stringify({
+  // 使用公众号昵称作为用户名
+  const username = `wx_${nick_name}`;
+
+  // 查找或创建用户
+  let user = getUserByUsername(username);
+
+  if (!user) {
+    // 创建新用户，使用固定 token（基于公众号昵称的 hash）
+    const fixedToken = randomUUID().replace(/-/g, '');
+    const success = createUser(username, fixedToken, fixedToken);
+    if (!success) {
+      return {
+        err: '创建用户失败',
+      };
+    }
+    user = getUserByUsername(username)!;
+  }
+
+  // 使用用户的固定 token
+  const userToken = user.token;
+
+  // 将微信 cookie 从临时 auth-key 迁移到用户的固定 token
+  const tempCookieData = await getMpCookie(tempAuthKey);
+  if (tempCookieData) {
+    await setMpCookie(userToken, tempCookieData);
+    // 清理临时 auth-key 的数据（可选）
+    // await deleteMpCookie(tempAuthKey);
+  }
+
+  // 设置 auth-key cookie（使用用户的固定 token）
+  // 先清除旧的 auth-key cookie，然后设置新的
+  setCookie(event, 'auth-key', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: -1, // 立即过期
+    path: '/',
+  });
+
+  setCookie(event, 'auth-key', userToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 30, // 30 天
+    path: '/',
+  });
+
+  return {
     nickname: nick_name,
     avatar: head_img,
-    expires: dayjs().add(4, 'days').toString(),
-  });
-  const headers = new Headers(response.headers);
-  headers.set('Content-Length', new TextEncoder().encode(body).length.toString());
-  return new Response(body, { headers: headers });
+    expires: dayjs().add(30, 'days').toString(),
+  };
 });

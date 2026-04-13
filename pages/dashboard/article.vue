@@ -14,6 +14,7 @@ import type {
 import { AgGridVue } from 'ag-grid-vue3';
 import { defu } from 'defu';
 import type { PreviewArticle } from '#components';
+import type { Ref } from 'vue';
 import { durationToSeconds, formatItemShowType, formatTimeStamp, sleep } from '#shared/utils/helpers';
 import { validateHTMLContent } from '#shared/utils/html';
 import GridAlbum from '~/components/grid/Album.vue';
@@ -23,16 +24,18 @@ import GridStatusBar from '~/components/grid/StatusBar.vue';
 import AccountSelectorForArticle from '~/components/selector/AccountSelectorForArticle.vue';
 import { isDev, websiteName } from '~/config';
 import { sharedGridOptions } from '~/config/shared-grid-options';
-import { articleDeleted, getArticleCache, updateArticleStatus } from '~/store/v2/article';
+// 保留：文章内容和留言的本地缓存（这些是下载的内容，不是查询的数据）
 import { getCommentCache } from '~/store/v2/comment';
 import { getDebugCache } from '~/store/v2/debug';
 import { getHtmlCache } from '~/store/v2/html';
-import { type MpAccount } from '~/store/v2/info';
 import { getMetadataCache, type Metadata } from '~/store/v2/metadata';
 import type { Preferences } from '~/types/preferences';
 import type { AppMsgExWithFakeID } from '~/types/types';
 import type { ArticleMetadata } from '~/utils/download/types';
 import { createBooleanColumnFilterParams, createDateColumnFilterParams } from '~/utils/grid';
+// 新增：使用文章 API
+import { useArticleApiWithState, useArticleFilter } from '~/composables/useArticleApi';
+import type { Article as ApiArticle } from '~/types/api';
 
 useHead({
   title: `文章下载 | ${websiteName}`,
@@ -51,6 +54,53 @@ interface Article extends AppMsgExWithFakeID, Partial<ArticleMetadata> {
   commentDownload: boolean;
 }
 
+// 新增：使用文章 API
+const articleApi = useArticleApiWithState();
+const {
+  fakeid,
+  status,
+  getParams,
+  resetFilter,
+  switchAccount,
+  switchStatus,
+  setPage,
+  page,
+  pageSize,
+  search,
+  setSearch,
+} = useArticleFilter();
+
+// 分页数据
+const pagination = ref({
+  total: 0,
+  page: 1,
+  pageSize: 50,
+  totalPages: 1,
+});
+
+// 当前页码（本地状态，用于 v-model）
+const currentPage = ref(1);
+// 输入框页码（用于分页输入框）
+const inputPage = ref(currentPage.value);
+
+// 搜索关键词
+const searchKeyword = ref('');
+
+// 处理搜索
+function handleSearch() {
+  setSearch(searchKeyword.value);
+  currentPage.value = 1;
+  refresh();
+}
+
+// 清除搜索
+function clearSearch() {
+  searchKeyword.value = '';
+  setSearch('');
+  currentPage.value = 1;
+  refresh();
+}
+
 let globalRowData: Article[] = [];
 
 const columnDefs = ref<ColDef[]>([
@@ -62,6 +112,15 @@ const columnDefs = ref<ColDef[]>([
     minWidth: 150,
     initialHide: true,
     cellClass: 'flex justify-center items-center font-mono',
+  },
+  {
+    headerName: '公众号',
+    field: 'account_nickname',
+    cellDataType: 'text',
+    filter: 'agTextColumnFilter',
+    valueFormatter: p => p.value || '--',
+    minWidth: 150,
+    cellClass: 'flex justify-center items-center',
   },
   {
     headerName: '链接',
@@ -106,11 +165,17 @@ const columnDefs = ref<ColDef[]>([
   {
     headerName: '创建时间',
     field: 'create_time',
-    valueFormatter: p => formatTimeStamp(p.value),
+    valueFormatter: p => (p.value ? formatTimeStamp(p.value) : '--'),
     filter: 'agDateColumnFilter',
     filterParams: createDateColumnFilterParams(),
     filterValueGetter: (params: ValueGetterParams) => {
-      return new Date(params.getValue('create_time') * 1000);
+      const value = params.getValue('create_time');
+      if (value && typeof value === 'number' && value > 0) {
+        // 判断是秒级还是毫秒级时间戳（10位是秒，13位是毫秒）
+        const timestamp = value < 10000000000 ? value * 1000 : value;
+        return new Date(timestamp);
+      }
+      return null;
     },
     minWidth: 180,
     initialHide: true,
@@ -119,11 +184,17 @@ const columnDefs = ref<ColDef[]>([
   {
     headerName: '发布时间',
     field: 'update_time',
-    valueFormatter: p => formatTimeStamp(p.value),
+    valueFormatter: p => (p.value ? formatTimeStamp(p.value) : '--'),
     filter: 'agDateColumnFilter',
     filterParams: createDateColumnFilterParams(),
     filterValueGetter: (params: ValueGetterParams) => {
-      return new Date(params.getValue('update_time') * 1000);
+      const value = params.getValue('update_time');
+      if (value && typeof value === 'number' && value > 0) {
+        // 判断是秒级还是毫秒级时间戳（10位是秒，13位是毫秒）
+        const timestamp = value < 10000000000 ? value * 1000 : value;
+        return new Date(timestamp);
+      }
+      return null;
     },
     minWidth: 180,
     cellClass: 'flex justify-center items-center font-mono',
@@ -275,7 +346,8 @@ const columnDefs = ref<ColDef[]>([
     cellRenderer: GridAlbum,
     sortable: false,
     filter: false,
-    valueFormatter: p => p.value.map((album: any) => album.title).join(','),
+    valueFormatter: p =>
+      p.value && Array.isArray(p.value) ? p.value.map((album: any) => album.title).join(',') : '--',
     minWidth: 150,
     initialHide: true,
   },
@@ -356,42 +428,99 @@ function preview(article: Article) {
   previewArticleRef.value!.open(article);
 }
 
-const loading = ref(false);
+// 保留原有的 loading 状态（用于表格加载动画）
+const tableLoading = ref(false);
 
 // 只能选择单个账号
-const selectedAccount = ref<MpAccount | undefined>();
+const selectedAccount = ref<{ fakeid: string; nickname: string; synced_count?: number } | undefined>();
 
-watch(selectedAccount, newVal => {
-  switchTableData(newVal!.fakeid).catch(() => {});
+// 修改：使用 API 加载数据
+watch(
+  selectedAccount,
+  newVal => {
+    if (newVal) {
+      switchAccount(newVal.fakeid);
+      currentPage.value = 1; // 重置页码
+      refresh();
+    }
+  },
+  { immediate: true }
+);
+
+// 监听页码变化
+watch(currentPage, newPage => {
+  setPage(newPage);
+  refresh();
 });
 
-async function switchTableData(fakeid: string) {
-  loading.value = true;
-  const articles: Article[] = [];
-  const data = await getArticleCache(fakeid, Math.floor(Date.now() / 1000));
-  for (const article of data) {
-    const contentDownload = (await getHtmlCache(article.link)) !== undefined;
-    const commentDownload = (await getCommentCache(article.link)) !== undefined;
-    const metadata = await getMetadataCache(article.link);
-    if (metadata) {
-      articles.push({
-        ...metadata,
-        ...article,
-        contentDownload: contentDownload,
-        commentDownload: commentDownload,
-      });
-    } else {
-      articles.push({
-        ...article,
-        contentDownload: contentDownload,
-        commentDownload: commentDownload,
-      });
+// 监控分页数据变化
+watch(
+  pagination,
+  newPagination => {
+    console.log('[article.vue] pagination 变化:', JSON.stringify(newPagination, null, 2));
+    console.log('[article.vue] 计算的页数:', newPagination.total / newPagination.pageSize);
+  },
+  { deep: true }
+);
+
+// 同步 inputPage 和 currentPage
+watch(currentPage, newPage => {
+  inputPage.value = newPage;
+});
+
+// 修改：使用新的 API 加载文章数据
+async function refresh() {
+  // 移除 fakeid 检查，允许显示所有文章
+  // if (!fakeid.value) return;
+
+  tableLoading.value = true;
+  try {
+    const params = getParams();
+    const result = await articleApi.fetchArticles(params);
+
+    // console.log('[article.vue] 后端返回的分页数据:', JSON.stringify(result.pagination, null, 2));
+
+    // 保存分页信息
+    pagination.value = result.pagination;
+    currentPage.value = result.pagination.page;
+
+    console.log('[article.vue] 更新后的 pagination.value:', JSON.stringify(pagination.value, null, 2));
+
+    // 合并 API 数据和本地缓存数据（下载状态、元数据等）
+    const articles: Article[] = [];
+    for (const article of result.items) {
+      const contentDownload = (await getHtmlCache(article.link)) !== undefined;
+      const commentDownload = (await getCommentCache(article.link)) !== undefined;
+      const metadata = await getMetadataCache(article.link);
+
+      if (metadata) {
+        articles.push({
+          ...metadata,
+          ...article,
+          contentDownload: contentDownload,
+          commentDownload: commentDownload,
+        });
+      } else {
+        articles.push({
+          ...article,
+          contentDownload: contentDownload,
+          commentDownload: commentDownload,
+        });
+      }
     }
+
+    await sleep(200);
+    globalRowData = articles.filter(article => (hideDeleted.value ? !article.is_deleted : true));
+    gridApi.value?.setGridOption('rowData', globalRowData);
+
+	    // 数据加载后重新应用列状态（避免列顺序被重置）
+	    await nextTick();
+	    restoreColumnState();
+  } catch (error: any) {
+    console.error('加载文章列表失败:', error);
+  } finally {
+    tableLoading.value = false;
   }
-  await sleep(200);
-  globalRowData = articles.filter(article => (hideDeleted.value ? !article.is_deleted : true));
-  gridApi.value?.setGridOption('rowData', globalRowData);
-  loading.value = false;
 }
 
 function updateRow(article: Article) {
@@ -399,6 +528,18 @@ function updateRow(article: Article) {
   if (rowNode) {
     rowNode.updateData(article);
   }
+}
+
+// 处理页码输入
+function handlePageInput() {
+  const page = Math.max(1, Math.min(pagination.value.totalPages, Number(inputPage.value) || 1));
+  if (page !== currentPage.value) {
+    setPage(page);
+    currentPage.value = page;
+    refresh();
+  }
+  // 重置输入框为当前页码
+  inputPage.value = currentPage.value;
 }
 
 const selectedArticles = shallowRef<Article[]>([]);
@@ -426,11 +567,17 @@ const {
       article._status = '正常';
       updateRow(article);
 
-      updateArticleStatus(url, '正常');
+      // 使用 API 更新状态
+      const key = `${article.fakeid}:${article.aid}`;
+      articleApi.markDownloaded(key).catch(err => {
+        console.error('更新文章状态失败:', err);
+      });
 
       // 修复之前代码逻辑错误导致的数据库状态被误设置为【已删除】
       article.is_deleted = false;
-      articleDeleted(url, false);
+      articleApi.markDeleted(key, false).catch(err => {
+        console.error('更新删除状态失败:', err);
+      });
     } else {
       console.warn(`${url} not found in table data when update contentDownload`);
     }
@@ -440,8 +587,7 @@ const {
     if (article) {
       article._status = status;
       updateRow(article);
-
-      updateArticleStatus(url, status);
+      // 状态变更暂时不调用 API，因为 _status 是前端扩展字段
     }
   },
   onDelete(url: string) {
@@ -451,8 +597,11 @@ const {
       article._status = '已删除';
       updateRow(article);
 
-      updateArticleStatus(url, '已删除');
-      articleDeleted(url);
+      // 使用 API 更新删除状态
+      const key = `${article.fakeid}:${article.aid}`;
+      articleApi.markDeleted(key, true).catch(err => {
+        console.error('标记删除失败:', err);
+      });
     }
   },
   onMetadata(url: string, metadata: Metadata) {
@@ -468,11 +617,18 @@ const {
         // 如果同步下载文章内容，则更新相关字段
         article.contentDownload = true;
         article._status = '正常';
-        updateArticleStatus(url, '正常');
+
+        // 使用 API 更新状态
+        const key = `${article.fakeid}:${article.aid}`;
+        articleApi.markDownloaded(key).catch(err => {
+          console.error('更新文章状态失败:', err);
+        });
 
         // 修复之前代码逻辑错误导致的数据库状态被误设置为【已删除】
         article.is_deleted = false;
-        articleDeleted(url, false);
+        articleApi.markDeleted(key, false).catch(err => {
+          console.error('更新删除状态失败:', err);
+        });
       }
 
       updateRow(article);
@@ -510,7 +666,7 @@ async function debug() {
   }
 }
 
-const copied = ref(false);
+const copied: Ref<boolean> = ref(false);
 function copyWechatLink() {
   const link = `https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz=${selectedAccount.value?.fakeid}&scene=124#wechat_redirect`;
   navigator.clipboard.writeText(link);
@@ -534,6 +690,21 @@ function copyWechatLink() {
         <div class="flex flex-col xl:flex-row gap-2">
           <div class="flex space-x-3">
             <AccountSelectorForArticle v-model="selectedAccount" class="w-80" />
+            <UInput
+              v-model="searchKeyword"
+              placeholder="搜索标题或摘要..."
+              color="gray"
+              size="md"
+              class="w-80"
+              @keyup.enter="handleSearch"
+              @blur="handleSearch"
+            >
+              <template v-if="searchKeyword && searchKeyword.length > 0" #trailing>
+                <span class="text-gray-400 cursor-pointer hover:text-gray-600" @click="clearSearch">
+                  <UIcon name="i-heroicons-x-mark-20-solid" />
+                </span>
+              </template>
+            </UInput>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -550,7 +721,6 @@ function copyWechatLink() {
           >
             <UButton
               :loading="downloadBtnLoading"
-              :disabled="!selectedAccount"
               color="white"
               class="font-mono"
               :label="downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : '抓取'"
@@ -596,9 +766,34 @@ function copyWechatLink() {
         </div>
       </header>
 
+      <!-- 加载状态 -->
+      <div v-if="articleApi.loading.value" class="flex items-center justify-center py-12">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p class="text-gray-600">{{ articleApi.loadingText.value }}</p>
+        </div>
+      </div>
+
+      <!-- 错误提示 -->
+      <div v-else-if="articleApi.error.value" class="bg-red-50 border border-red-200 rounded-md p-4 m-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 0 008 0z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p class="text-sm font-medium text-red-800">{{ articleApi.error.value }}</p>
+            <button @click="articleApi.clearError()" class="mt-1 text-sm text-red-700 underline">关闭</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 数据表格 -->
       <ag-grid-vue
+        v-else
         style="width: 100%; height: 100%"
-        :loading="loading"
+        :loading="tableLoading"
         :rowData="globalRowData"
         :columnDefs="columnDefs"
         :gridOptions="gridOptions"
@@ -610,6 +805,53 @@ function copyWechatLink() {
         @column-resized="onColumnStateChange"
         @selection-changed="onSelectionChanged"
       ></ag-grid-vue>
+
+      <!-- 分页 -->
+      <div
+        v-if="pagination.totalPages > 1"
+        class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+      >
+        <div class="text-sm text-gray-600 dark:text-gray-400">
+          共 {{ pagination.total }} 条记录，第 {{ currentPage }} / {{ pagination.totalPages }} 页
+        </div>
+        <div class="flex items-center gap-2">
+          <UButton
+            icon="i-heroicons-chevron-left"
+            :disabled="currentPage === 1"
+            @click="currentPage > 1 && (currentPage--, setPage(currentPage), refresh())"
+          />
+          <div class="flex items-center gap-1">
+            <UInput
+              type="number"
+              v-model="inputPage"
+              :min="1"
+              :max="pagination.totalPages"
+              class="w-16 text-center"
+              @keyup.enter="handlePageInput"
+              @blur="handlePageInput"
+            />
+            <span class="text-sm text-gray-600 dark:text-gray-400">/ {{ pagination.totalPages }}</span>
+          </div>
+          <UButton
+            icon="i-heroicons-chevron-right"
+            :disabled="currentPage === pagination.totalPages"
+            @click="currentPage < pagination.totalPages && (currentPage++, setPage(currentPage), refresh())"
+          />
+          <UButton
+            icon="i-heroicons-arrow-uturn-right"
+            size="sm"
+            color="gray"
+            variant="ghost"
+            @click="
+              currentPage = 1;
+              setPage(1);
+              refresh();
+            "
+          >
+            <span class="sr-only">刷新</span>
+          </UButton>
+        </div>
+      </div>
     </div>
 
     <PreviewArticle ref="previewArticleRef" />

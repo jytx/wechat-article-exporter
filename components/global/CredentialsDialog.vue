@@ -301,7 +301,7 @@ onMounted(() => {
     start();
   }
   refreshCredentialAddedState();
-  startListenService();
+  // startListenService(); // 注释掉自动启动，避免报错
 });
 
 onUnmounted(() => {

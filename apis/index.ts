@@ -42,8 +42,8 @@ export async function getArticleList(
     const publish_page: PublishPage = JSON.parse(resp.publish_page);
     const publish_list = publish_page.publish_list.filter(item => !!item.publish_info);
 
-    // 返回的文章数量为0就表示已加载完毕
-    const isCompleted = publish_list.length === 0;
+    // 返回的文章数量小于请求的页面大小时，表示已加载完毕
+    const isCompleted = publish_list.length < ARTICLE_LIST_PAGE_SIZE;
 
     // 更新缓存，注意带有关键字搜索的结果不能写入缓存
     if (!keyword) {

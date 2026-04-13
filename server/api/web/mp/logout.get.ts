@@ -8,8 +8,13 @@ import { proxyMpRequest } from '~/server/utils/proxy-request';
 
 export default defineEventHandler(async event => {
   const token = await getTokenFromStore(event);
+
+  // 如果没有token，说明已经退出或从未登录，直接返回成功
   if (!token) {
-    return { statusCode: 401, statusText: '未登录或登录已过期，请重新扫码登录' };
+    return {
+      statusCode: 200,
+      statusText: 'OK',
+    };
   }
 
   const response: Response = await proxyMpRequest({

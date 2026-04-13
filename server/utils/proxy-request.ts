@@ -67,11 +67,11 @@ export async function proxyMpRequest(options: RequestOptions) {
   }
 
   // 处理登录成功请求的 cookie
-  // 只有登录请求才会将 Cookie 数据写入 CookieStore
-  // 返回给客户端的一个 auth-key 的 cookie
+  // 生成临时的 auth-key，后续会迁移到用户的固定 token
   else if (options.action === 'login') {
     // 提取出 token 和 cookies
     try {
+      // 生成临时的 auth-key（稍后会迁移到用户的固定 token）
       const authKey = crypto.randomUUID().replace(/-/g, '');
 
       const body = await mpResponse.clone().json();
@@ -88,11 +88,12 @@ export async function proxyMpRequest(options: RequestOptions) {
       console.log('token', token);
       const success = await cookieStore.setCookie(authKey, token, mpResponse.headers.getSetCookie());
       if (!success) {
-        throw new Error('cookie 写入 KV 存储失败');
+        throw new Error('cookie 写入数据库失败');
       }
       console.log('cookie 写入成功');
 
       setCookies = [
+        // 返回临时的 auth-key 给客户端
         `auth-key=${authKey}; Path=/; Expires=${dayjs().add(4, 'days').toString()}; Secure; HttpOnly`,
 
         // 登录成功后，删除浏览器的 uuid cookie

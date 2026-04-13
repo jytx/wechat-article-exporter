@@ -36,10 +36,18 @@ export default defineNuxtConfig({
   },
   nitro: {
     minify: process.env.NODE_ENV === 'production',
-    storage: {
-      kv: {
-        driver: process.env.NITRO_KV_DRIVER || 'memory',
-        base: process.env.NITRO_KV_BASE,
+    // 使用 SQLite 数据库存储
+    experimental: {
+      session: {
+        enabled: true,
+        name: 'wae_session',
+        password: process.env.SESSION_SECRET || 'change-me-in-production',
+        rolling: true,
+        maxAge: 7 * 24 * 60 * 60, // 7 天（秒）
+      },
+      // 启用 SQLite 数据库插件
+      sql: {
+        enable: true,
       },
     },
   },

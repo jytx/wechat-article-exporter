@@ -9,6 +9,9 @@ function padLeft(num: number, len: number = 2) {
 }
 
 export function formatAlbumTime(timestamp: number) {
+  if (!timestamp || typeof timestamp !== 'number' || timestamp <= 0) {
+    return '--';
+  }
   const currentSeconds = Math.round(new Date().getTime() / 1000),
     now = new Date(1000 * currentSeconds),
     o = new Date(1000 * timestamp),
@@ -17,6 +20,11 @@ export function formatAlbumTime(timestamp: number) {
       month: padLeft(o.getMonth() + 1),
       date: padLeft(o.getDate()),
     };
+
+  // 检查日期是否有效
+  if (isNaN(r.year) || isNaN(r.month) || isNaN(r.date)) {
+    return '--';
+  }
 
   now.setHours(0);
   now.setMinutes(0);
