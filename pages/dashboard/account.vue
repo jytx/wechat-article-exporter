@@ -65,7 +65,7 @@
 	function addAccount() {
 	  if (!checkLogin()) return;
 
-	  searchAccountDialogRef.value!.open();
+	  searchAccountDialogRef.value!.open(false);
 	}
 
 	async function onSelectAccount(account: Account) {
@@ -80,7 +80,7 @@
 	      signature: account.signature
 	    });
 
-	    // 不再自动同步文章
+	    // 刷新列表
 	    await refresh();
 
 	    toast.success('公众号添加成功', `已成功添加公众号【${account.nickname}】，请点击同步按钮同步文章`);
@@ -180,6 +180,8 @@
 	        update_time: article.update_time,
 	        datetime: article.datetime,
 	        digest: article.digest,
+	        album_id: article.album_id || null,
+	        appmsg_album_infos: article.appmsg_album_infos || [],
 	        downloaded: 0,
 	        is_deleted: 0
 	      }));

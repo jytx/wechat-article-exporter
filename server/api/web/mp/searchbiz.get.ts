@@ -11,6 +11,23 @@ interface SearchBizQuery {
   keyword: string;
 }
 
+/**
+ * 验证搜索关键词是否有效
+ */
+function isValidKeyword(keyword: any): boolean {
+  if (!keyword || typeof keyword !== 'string') return false;
+
+  const trimmed = keyword.trim();
+
+  // 检查长度：微信搜索 API 限制
+  if (trimmed.length === 0 || trimmed.length > 100) return false;
+
+  // 检查是否包含有效字符（至少一个中文字符、英文字母或数字）
+  const hasValidChar = /[\u4e00-\u9fa5a-zA-Z0-9]/.test(trimmed);
+
+  return hasValidChar;
+}
+
 export default defineEventHandler(async event => {
   const token = await getTokenFromStore(event);
   if (!token) {
@@ -19,6 +36,19 @@ export default defineEventHandler(async event => {
 
   const query = getQuery<SearchBizQuery>(event);
   const keyword = query.keyword;
+
+  // 验证搜索关键词
+  if (!isValidKeyword(keyword)) {
+    return {
+      base_resp: {
+        ret: -1,
+        err_msg: '搜索关键词无效，请输入有效的公众号名称或微信号',
+      },
+      list: [],
+      total: 0,
+    };
+  }
+
   const begin: number = query.begin || 0;
   const size: number = query.size || 5;
 

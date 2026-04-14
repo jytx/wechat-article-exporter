@@ -19,6 +19,8 @@ export interface Article {
   digest?: string;
   downloaded: number;
   is_deleted: number;
+  album_id?: string;
+  appmsg_album_infos?: any;
   created_at?: number;
   updated_at?: number;
   // 公众号信息（联表查询）
@@ -34,8 +36,8 @@ export async function saveArticle(article: Article): Promise<boolean> {
     const db = getDatabase();
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO articles
-      (key, fakeid, aid, title, link, cover, author, create_time, update_time, datetime, digest, downloaded, is_deleted, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+      (key, fakeid, aid, title, link, cover, author, create_time, update_time, datetime, digest, downloaded, is_deleted, album_id, appmsg_album_infos, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
     `);
 
     stmt.run(
@@ -51,7 +53,9 @@ export async function saveArticle(article: Article): Promise<boolean> {
       article.datetime || null,
       article.digest || null,
       article.downloaded,
-      article.is_deleted
+      article.is_deleted,
+      article.album_id || null,
+      JSON.stringify(article.appmsg_album_infos || [])
     );
 
     return true;
@@ -69,8 +73,8 @@ export async function saveArticles(articles: Article[]): Promise<number> {
     const db = getDatabase();
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO articles
-      (key, fakeid, aid, title, link, cover, author, create_time, update_time, datetime, digest, downloaded, is_deleted, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+      (key, fakeid, aid, title, link, cover, author, create_time, update_time, datetime, digest, downloaded, is_deleted, album_id, appmsg_album_infos, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
     `);
 
     const insertMany = db.transaction((articleList: Article[]) => {
@@ -88,7 +92,9 @@ export async function saveArticles(articles: Article[]): Promise<number> {
           article.datetime || null,
           article.digest || null,
           article.downloaded,
-          article.is_deleted
+          article.is_deleted,
+          article.album_id || null,
+          JSON.stringify(article.appmsg_album_infos || [])
         );
       }
     });
@@ -112,6 +118,21 @@ export async function getArticle(key: string): Promise<Article | null> {
     return row || null;
   } catch (error) {
     console.error('getArticle failed:', error);
+    return null;
+  }
+}
+
+/**
+ * 根据链接获取单篇文章
+ */
+export async function getArticleByUrl(url: string): Promise<Article | null> {
+  try {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM articles WHERE link = ? AND is_deleted = 0');
+    const row = stmt.get(url) as any;
+    return row || null;
+  } catch (error) {
+    console.error('getArticleByUrl failed:', error);
     return null;
   }
 }

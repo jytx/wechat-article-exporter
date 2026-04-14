@@ -133,6 +133,7 @@ import type { AppMsgAlbumResult, ArticleItem, BaseInfo } from '~/types/album';
 import type { AppMsgAlbumInfo, DownloadableArticle } from '~/types/types';
 import { gotoLink } from '~/utils';
 import { formatAlbumTime } from '~/utils/album';
+import usePreferences from '~/composables/usePreferences';
 
 useHead({
   title: `合集下载 | ${websiteName}`,
@@ -301,7 +302,9 @@ function doBatchDownload() {
   }));
   selectedArticleCount.value = articles.length;
   const filename = downloadFileName.value;
-  batchDownload(articles, filename);
+  const preferences = usePreferences();
+  const exportPath = preferences.value.exportConfig.exportPath;
+  batchDownload(articles, filename, exportPath);
 }
 
 // 抓取全部文章链接

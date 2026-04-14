@@ -85,9 +85,10 @@ export function updateSessionActivity(session: SessionData): SessionData {
 }
 
 /**
- * 获取 Session
+ * 获取用户 Session
+ * 避免与 h3 的 getSession 冲突
  */
-export async function getSession(event: H3Event<EventType>): Promise<SessionData | null> {
+export async function getUserSession(event: H3Event<EventType>): Promise<SessionData | null> {
   const { getSession: getSessionH3, Session } = await import('h3');
   const session = await getSessionH3(event, sessionConfig);
 

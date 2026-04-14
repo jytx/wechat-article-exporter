@@ -29,6 +29,7 @@ import { getCommentCache } from '~/store/v2/comment';
 import { getDebugCache } from '~/store/v2/debug';
 import { getHtmlCache } from '~/store/v2/html';
 import { getMetadataCache, type Metadata } from '~/store/v2/metadata';
+	import { isArticleHtmlDownloadedOnServer } from '~/utils/server-html';
 import type { Preferences } from '~/types/preferences';
 import type { AppMsgExWithFakeID } from '~/types/types';
 import type { ArticleMetadata } from '~/utils/download/types';
@@ -36,6 +37,8 @@ import { createBooleanColumnFilterParams, createDateColumnFilterParams } from '~
 // 新增：使用文章 API
 import { useArticleApiWithState, useArticleFilter } from '~/composables/useArticleApi';
 import type { Article as ApiArticle } from '~/types/api';
+import { exportArticlesToServer } from '~/utils/server-article-export';
+import toastFactory from '~/composables/toast';
 
 useHead({
   title: `文章下载 | ${websiteName}`,
@@ -489,7 +492,7 @@ async function refresh() {
     // 合并 API 数据和本地缓存数据（下载状态、元数据等）
     const articles: Article[] = [];
     for (const article of result.items) {
-      const contentDownload = (await getHtmlCache(article.link)) !== undefined;
+      const contentDownload = await isArticleHtmlDownloadedOnServer(article.link);
       const commentDownload = (await getCommentCache(article.link)) !== undefined;
       const metadata = await getMetadataCache(article.link);
 
@@ -647,6 +650,22 @@ const {
   },
 });
 
+// 抓取类型选项
+const downloadTypes = [
+  { label: '文章内容', value: 'html' },
+  { label: '阅读量', value: 'metadata' },
+  { label: '留言', value: 'comment' },
+  { label: '修复 FakeID', value: 'fakeid' },
+] as const;
+
+// 当前选择的抓取类型
+const selectedDownloadType = ref<(typeof downloadTypes)[number]['value']>('html');
+
+// 执行抓取
+async function executeDownload() {
+  await download(selectedDownloadType.value, selectedArticleUrls.value);
+}
+
 const {
   loading: exportBtnLoading,
   phase: exportPhase,
@@ -654,6 +673,94 @@ const {
   total_count: exportTotalCount,
   exportFile,
 } = useExporter();
+
+// 导出格式选项
+const exportFormats = [
+  { label: 'Excel', value: 'excel' },
+  { label: 'JSON', value: 'json' },
+  { label: 'HTML', value: 'html' },
+  { label: 'Txt', value: 'text' },
+  { label: 'Markdown', value: 'markdown' },
+  { label: 'Word (内测中)', value: 'word' },
+] as const;
+
+// 当前选择的导出格式
+const selectedExportFormat = ref<(typeof exportFormats)[number]['value']>('markdown');
+
+// 执行导出
+async function executeExport() {
+  const toast = toastFactory();
+  const preferences = usePreferences();
+  const exportPath = preferences.value.exportConfig.exportPath;
+
+  // 检查是否设置了导出路径
+  if (!exportPath || exportPath === '') {
+    toast.warning('提示', '请先在"其他设置"中设置导出路径');
+    return;
+  }
+
+  const format = selectedExportFormat.value;
+  const urls = selectedArticleUrls.value;
+
+  if (urls.length === 0) {
+    toast.warning('提示', '请先选择文章');
+    return;
+  }
+
+  // 检查内容是否已下载（仅对需要内容的格式）
+  if (['html', 'text', 'markdown', 'word'].includes(format) && contentNotDownloadedCount.value > 0) {
+    toast.warning('提示', `有 ${contentNotDownloadedCount.value} 篇文章尚未抓取内容，请先抓取内容后再导出`);
+    return;
+  }
+
+  try {
+    exportBtnLoading.value = true;
+    exportPhase.value = '准备中';
+    exportCompletedCount.value = 0;
+    exportTotalCount.value = urls.length;
+
+    // 收集文章信息
+    const articles = selectedArticles.value.map(article => ({
+      url: article.link,
+      title: article.title,
+      fakeid: article.fakeid,
+      accountName: article.account_nickname || '未知公众号'
+    }));
+
+    // 导出格式映射
+    const formatMap: Record<string, 'markdown' | 'html' | 'txt'> = {
+      markdown: 'markdown',
+      html: 'html',
+      text: 'txt',
+      word: 'markdown', // Word 暂时用 markdown 替代
+    };
+
+    const exportFormat = formatMap[format] || 'markdown';
+
+    // 调用服务端导出
+    const result = await exportArticlesToServer(
+      articles,
+      exportFormat,
+      exportPath,
+      (current, total) => {
+        exportCompletedCount.value = current;
+        exportTotalCount.value = total;
+        exportPhase.value = `导出中 ${current}/${total}`;
+      }
+    );
+
+    if (result.success) {
+      toast.success('导出成功', result.message);
+    } else {
+      toast.error('导出失败', result.message);
+    }
+  } catch (error) {
+    console.error('导出失败:', error);
+    toast.error('导出失败', error instanceof Error ? error.message : '未知错误');
+  } finally {
+    exportBtnLoading.value = false;
+  }
+}
 
 async function debug() {
   const cache = await getDebugCache('https://mp.weixin.qq.com/s/0IEaqpJIBGykHFKqj-7xqw');
@@ -708,52 +815,87 @@ function copyWechatLink() {
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <UButton v-if="downloadBtnLoading" color="black" @click="stopDownload">停止</UButton>
-          <ButtonGroup
-            :items="[
-              { label: '文章内容', event: 'download-article-html' },
-              { label: '阅读量 (需要Credential)', event: 'download-article-metadata' },
-              { label: '留言内容 (需要Credential)', event: 'download-article-comment' },
-            ]"
-            @download-article-html="download('html', selectedArticleUrls)"
-            @download-article-metadata="download('metadata', selectedArticleUrls)"
-            @download-article-comment="download('comment', selectedArticleUrls)"
+          <UButton
+            v-if="downloadBtnLoading"
+            color="black"
+            @click="stopDownload"
           >
+            停止
+          </UButton>
+
+          <!-- 抓取按钮组 -->
+          <div class="flex items-center gap-0">
+            <!-- 主抓取按钮 -->
             <UButton
               :loading="downloadBtnLoading"
+              :disabled="!selectedAccount"
               color="white"
-              class="font-mono"
-              :label="downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : '抓取'"
-              trailing-icon="i-heroicons-chevron-down-20-solid"
+              class="font-mono rounded-r-none"
+              :label="downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : `抓取 (${downloadTypes.find(t => t.value === selectedDownloadType)?.label})`"
+              @click="executeDownload"
             />
-          </ButtonGroup>
+            <!-- 下拉选择按钮 -->
+            <UPopover>
+              <UButton
+                :disabled="!selectedAccount || downloadBtnLoading"
+                color="white"
+                class="font-mono rounded-l-none border-l-0"
+                icon="i-heroicons-chevron-down-20-solid"
+              />
+              <template #panel>
+                <div class="p-1">
+                  <button
+                    v-for="type in downloadTypes"
+                    :key="type.value"
+                    @click="selectedDownloadType = type.value"
+                    class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    :class="{
+                      'bg-gray-100 dark:bg-gray-800': selectedDownloadType === type.value
+                    }"
+                  >
+                    {{ type.label }}
+                  </button>
+                </div>
+              </template>
+            </UPopover>
+          </div>
 
-          <ButtonGroup
-            :items="[
-              { label: 'Excel', event: 'export-article-excel' },
-              { label: 'JSON', event: 'export-article-json' },
-              { label: 'HTML', event: 'export-article-html' },
-              { label: 'Txt', event: 'export-article-text' },
-              { label: 'Markdown', event: 'export-article-markdown' },
-              { label: 'Word (内测中)', event: 'export-article-word' },
-              // { label: 'PDF (计划中)', event: 'export-article-pdf', disabled: true },
-            ]"
-            @export-article-excel="exportFile('excel', selectedArticleUrls)"
-            @export-article-json="exportFile('json', selectedArticleUrls)"
-            @export-article-html="exportFile('html', selectedArticleUrls, contentNotDownloadedCount)"
-            @export-article-text="exportFile('text', selectedArticleUrls, contentNotDownloadedCount)"
-            @export-article-markdown="exportFile('markdown', selectedArticleUrls, contentNotDownloadedCount)"
-            @export-article-word="exportFile('word', selectedArticleUrls, contentNotDownloadedCount)"
-          >
+          <!-- 导出按钮组 -->
+          <div class="flex items-center gap-0">
+            <!-- 主导出按钮 -->
             <UButton
               :loading="exportBtnLoading"
               :disabled="!selectedAccount"
               color="white"
-              class="font-mono"
-              :label="exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : '导出'"
-              trailing-icon="i-heroicons-chevron-down-20-solid"
+              class="font-mono rounded-r-none"
+              :label="exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : `导出 (${exportFormats.find(f => f.value === selectedExportFormat)?.label})`"
+              @click="executeExport"
             />
-          </ButtonGroup>
+            <!-- 下拉选择按钮 -->
+            <UPopover>
+              <UButton
+                :disabled="!selectedAccount || exportBtnLoading"
+                color="white"
+                class="font-mono rounded-l-none border-l-0"
+                icon="i-heroicons-chevron-down-20-solid"
+              />
+              <template #panel>
+                <div class="p-1">
+                  <button
+                    v-for="format in exportFormats"
+                    :key="format.value"
+                    @click="selectedExportFormat = format.value"
+                    class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    :class="{
+                      'bg-gray-100 dark:bg-gray-800': selectedExportFormat === format.value
+                    }"
+                  >
+                    {{ format.label }}
+                  </button>
+                </div>
+              </template>
+            </UPopover>
+          </div>
 
           <UButton
             :disabled="!selectedAccount"

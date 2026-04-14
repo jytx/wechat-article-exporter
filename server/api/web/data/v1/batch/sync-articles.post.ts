@@ -65,6 +65,8 @@ export default defineEventHandler(async event => {
               update_time: article.update_time,
               datetime: article.datetime,
               digest: article.digest,
+              album_id: article.album_id || null,
+              appmsg_album_infos: article.appmsg_album_infos || [],
               downloaded: false,
               is_deleted: false,
             });

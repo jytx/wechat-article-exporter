@@ -23,6 +23,9 @@ export interface Preferences {
 }
 
 interface ExportConfig {
+  // 导出路径（服务端文件系统路径）
+  exportPath: string;
+
   // 目录名格式
   dirname: string;
 

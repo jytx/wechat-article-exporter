@@ -29,6 +29,33 @@ async function downloadAssetWithProxy<T extends Blob | string>(
       headers.cookie = `pass_ticket=${credentials.pass_ticket};wap_sid2=${credentials.wap_sid2}`;
     } catch (e) {}
   }
+
+  // 对于微信域名（文章、图片等资源），使用服务端代理避免 CORS 问题
+  if (
+    url.includes('mp.weixin.qq.com') ||
+    url.includes('mmbiz.qpic.cn') ||
+    url.includes('wx.qlogo.cn') ||
+    url.includes('res.wx.qq.com')
+  ) {
+    // 确保 URL 是 https
+    let targetUrl = url.replace(/^http:\/\//, 'https://');
+    const proxyUrl = `/api/proxy/article-html?url=${encodeURIComponent(targetUrl)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      throw new Error(`请求失败: ${response.statusText}`);
+    }
+    // 根据期望的返回类型返回结果
+    if (typeof Blob !== 'undefined' && url.includes('mmbiz.qpic.cn')) {
+      // 图片资源返回 Blob
+      const blob = await response.blob();
+      return blob as T;
+    } else {
+      // 其他资源返回 text
+      const html = await response.text();
+      return html as T;
+    }
+  }
+
   let targetURL = proxy
     ? `${proxy}?url=${encodeURIComponent(url)}&headers=${encodeURIComponent(JSON.stringify(headers))}`
     : url;
@@ -724,7 +751,8 @@ export async function packHTMLAssets(fakeid: string, html: string, title: string
     if (cachedAsset) {
       stylesheetFile = cachedAsset.file;
     } else {
-      const stylesheet = await request<string>(url, { retry: 1, retryDelay: 2000 });
+      // 使用服务端代理下载 CSS 资源，避免 CORS 问题
+      const stylesheet = await downloadAssetWithProxy<string>(url, undefined, false, 30);
       stylesheetFile = new Blob([stylesheet], { type: 'text/css' });
       await updateAssetCache({ url: url, file: stylesheetFile, fakeid: fakeid });
     }

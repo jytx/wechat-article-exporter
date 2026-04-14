@@ -25,12 +25,13 @@ import { websiteName } from '~/config';
 import { sharedGridOptions } from '~/config/shared-grid-options';
 import { articleDeleted, updateArticleFakeid, updateArticleStatus } from '~/store/v2/article';
 import { db } from '~/store/v2/db';
-import { getHtmlCache } from '~/store/v2/html';
+import { getArticleHtmlFromServer } from '~/utils/server-html';
 import type { Metadata } from '~/store/v2/metadata';
 import type { Preferences } from '~/types/preferences';
 import type { AppMsgExWithFakeID } from '~/types/types';
 import type { ArticleMetadata } from '~/utils/download/types';
 import { createBooleanColumnFilterParams, createDateColumnFilterParams } from '~/utils/grid';
+import { exportArticlesToServer } from '~/utils/server-article-export';
 
 useHead({
   title: `单篇文章下载 | ${websiteName}`,
@@ -90,8 +91,8 @@ const columnDefs = ref<ColDef[]>([
     field: 'link',
     cellDataType: 'text',
     filter: 'agTextColumnFilter',
-    flex: 3,
-    minWidth: 240,
+    flex: 2,
+    minWidth: 180,
     cellClass: 'font-mono',
   },
   {
@@ -309,18 +310,79 @@ function createRow(url: string): SingleArticleRow {
 
 async function addArticle() {
   try {
-    const normalized = normalizeUrl(inputUrl.value);
-    if (globalRowData.value.some(row => row.link === normalized)) {
-      toast.info('提示', '该链接已存在列表中');
-      return;
+    let originalUrl = normalizeUrl(inputUrl.value);
+    console.log('添加文章，原始 URL:', originalUrl);
+
+    // 检查是否是 /s/ 格式且缺少完整参数的短链接
+    const needsResolution = originalUrl.includes('/s/') && !originalUrl.includes('__biz=');
+    console.log('是否需要解析:', needsResolution);
+
+    let finalUrl = originalUrl;
+    let resolvedTitle = '';
+
+    if (needsResolution) {
+      toast.info('提示', '正在解析分享链接...');
+      console.log('🔍 调用解析 API:', `/api/web/misc/resolve-url?url=${encodeURIComponent(originalUrl)}`);
+      try {
+        const response = await fetch(`/api/web/misc/resolve-url?url=${encodeURIComponent(originalUrl)}`, {
+          credentials: 'include',
+        });
+        console.log('📡 API 响应状态:', response.status, response.statusText);
+        const data = await response.json();
+        console.log('解析 API 响应:', data);
+        if (data.success && data.data) {
+          // 使用解析出的完整链接
+          finalUrl = data.data.fullUrl;
+          resolvedTitle = data.data.title || '';
+          console.log('✅ 解析成功，完整链接:', finalUrl, '标题:', resolvedTitle);
+
+          // 如果是部分成功（只有标题，没有完整链接）
+          if (data.data.partial) {
+            console.log('⚠️ 部分成功：只提取到标题，使用原始链接');
+            finalUrl = originalUrl;
+          }
+
+          // 先检查完整链接是否已存在
+          if (globalRowData.value.some(row => row.link === finalUrl)) {
+            toast.info('提示', '该文章已存在列表中');
+            return;
+          }
+        } else {
+          // 解析失败，使用原始链接继续尝试
+          console.warn('⚠️ 解析分享链接失败，使用原始链接继续');
+          console.warn('错误信息:', data);
+          finalUrl = originalUrl;
+        }
+      } catch (error: any) {
+        // 解析出错，使用原始链接继续尝试
+        console.warn('⚠️ 解析分享链接出错:', error?.message, '使用原始链接继续');
+        console.error('完整错误:', error);
+        finalUrl = originalUrl;
+      }
+    } else {
+      // 不是短链接，直接检查是否存在
+      if (globalRowData.value.some(row => row.link === finalUrl)) {
+        toast.info('提示', '该链接已存在列表中');
+        return;
+      }
     }
-    const row = createRow(normalized);
+
+    // 使用最终确定的 URL（可能是解析后的完整链接，也可能是原始链接）创建行
+    const row = createRow(finalUrl);
+
+    // 如果解析出了标题，直接使用
+    if (resolvedTitle) {
+      row.title = resolvedTitle;
+    }
+
+    console.log('创建的行数据:', row);
     globalRowData.value = [row, ...globalRowData.value];
     await upsertArticleStub(row);
     refreshGrid();
     inputUrl.value = '';
     await downloadRows([row], { silent: true });
   } catch (error: any) {
+    console.error('添加文章失败:', error);
     toast.error('添加失败', error?.message || '链接格式不正确');
   }
 }
@@ -477,6 +539,22 @@ const {
   },
 });
 
+// 抓取类型选项
+const downloadTypes = [
+  { label: '文章内容', value: 'html' },
+  { label: '阅读量', value: 'metadata' },
+  { label: '留言', value: 'comment' },
+  { label: '修复 FakeID', value: 'fakeid' },
+] as const;
+
+// 当前选择的抓取类型
+const selectedDownloadType = ref<(typeof downloadTypes)[number]['value']>('html');
+
+// 执行抓取
+async function executeDownload() {
+  await download(selectedDownloadType.value, selectedArticleUrls.value);
+}
+
 async function downloadRows(targetRows: SingleArticleRow[], options: { silent?: boolean } = {}) {
   const { silent = false } = options;
   if (targetRows.length === 0) {
@@ -498,12 +576,25 @@ async function downloadRows(targetRows: SingleArticleRow[], options: { silent?: 
 }
 
 async function updateRowFromHtml(row: SingleArticleRow) {
-  const cache = await getHtmlCache(row.link);
-  if (!cache) return;
-  const html = await cache.file.text();
+  const cache = await getArticleHtmlFromServer(row.link);
+  if (!cache) {
+    console.warn('updateRowFromHtml: cache is null for', row.link);
+    return;
+  }
+  const html = cache.content;
+  console.log('updateRowFromHtml: html type:', typeof html, 'length:', html?.length);
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-  const title = doc.querySelector('#activity-name')?.textContent?.trim();
+
+  // 尝试多种方式提取标题
+  let title =
+    doc.querySelector('#activity-name')?.textContent?.trim() ||
+    doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
+    doc.querySelector('title')?.textContent?.trim() ||
+    '';
+
+  console.log('updateRowFromHtml: parsed title:', title);
+
   const author =
     doc.querySelector('#js_author_name')?.textContent?.trim() || doc.querySelector('#js_name')?.textContent?.trim();
   const digest = doc.querySelector('#js_content')?.textContent?.trim()?.slice(0, 160) || row.digest;
@@ -562,6 +653,92 @@ const {
   exportFile,
 } = useExporter();
 
+// 导出格式选项
+const exportFormats = [
+  { label: 'Excel', value: 'excel' },
+  { label: 'JSON', value: 'json' },
+  { label: 'HTML', value: 'html' },
+  { label: 'Txt', value: 'text' },
+  { label: 'Markdown', value: 'markdown' },
+] as const;
+
+// 当前选择的导出格式
+const selectedExportFormat = ref<(typeof exportFormats)[number]['value']>('markdown');
+
+// 执行导出
+async function executeExport() {
+  const preferences = usePreferences();
+  const exportPath = preferences.value.exportConfig.exportPath;
+
+  // 检查是否设置了导出路径
+  if (!exportPath || exportPath === '') {
+    toast.warning('提示', '请先在"其他设置"中设置导出路径');
+    return;
+  }
+
+  const format = selectedExportFormat.value;
+  const urls = selectedArticleUrls.value;
+
+  if (urls.length === 0) {
+    toast.warning('提示', '请先选择文章');
+    return;
+  }
+
+  // 检查内容是否已下载（仅对需要内容的格式）
+  if (['html', 'text', 'markdown', 'word'].includes(format) && contentNotDownloadedCount.value > 0) {
+    toast.warning('提示', `有 ${contentNotDownloadedCount.value} 篇文章尚未抓取内容，请先抓取内容后再导出`);
+    return;
+  }
+
+  try {
+    exportBtnLoading.value = true;
+    exportPhase.value = '准备中';
+    exportCompletedCount.value = 0;
+    exportTotalCount.value = urls.length;
+
+    // 收集文章信息（single 页面每篇文章可能属于不同的公众号）
+    const articles = selectedArticles.value.map(article => ({
+      url: article.link,
+      title: article.title,
+      fakeid: article.fakeid,
+      accountName: article.accountName || '未知公众号'
+    }));
+
+    // 导出格式映射
+    const formatMap: Record<string, 'markdown' | 'html' | 'txt'> = {
+      markdown: 'markdown',
+      html: 'html',
+      text: 'txt',
+      word: 'markdown', // Word 暂时用 markdown 替代
+    };
+
+    const exportFormat = formatMap[format] || 'markdown';
+
+    // 调用服务端导出
+    const result = await exportArticlesToServer(
+      articles,
+      exportFormat,
+      exportPath,
+      (current, total) => {
+        exportCompletedCount.value = current;
+        exportTotalCount.value = total;
+        exportPhase.value = `导出中 ${current}/${total}`;
+      }
+    );
+
+    if (result.success) {
+      toast.success('导出成功', result.message);
+    } else {
+      toast.error('导出失败', result.message);
+    }
+  } catch (error) {
+    console.error('导出失败:', error);
+    toast.error('导出失败', error instanceof Error ? error.message : '未知错误');
+  } finally {
+    exportBtnLoading.value = false;
+  }
+}
+
 async function deleteRowData(row: SingleArticleRow) {
   const key = `${row.fakeid}:${row.aid}`;
   await db.transaction('rw', ['article', 'html'], async () => {
@@ -602,51 +779,79 @@ async function removeRows() {
           <UButton color="blue" @click="addArticle">添加</UButton>
         </div>
         <div class="flex items-center gap-3">
-          <ButtonGroup
-            :items="[
-              { label: '修复fakeid', event: 'fix-fakeid' },
-              { label: '文章内容', event: 'download-article-html' },
-              { label: '阅读量 (需要Credential)', event: 'download-article-metadata' },
-              { label: '留言内容 (需要Credential)', event: 'download-article-comment' },
-            ]"
-            @fix-fakeid="download('fakeid', selectedArticleUrls)"
-            @download-article-html="download('html', selectedArticleUrls)"
-            @download-article-metadata="download('metadata', selectedArticleUrls)"
-            @download-article-comment="download('comment', selectedArticleUrls)"
-          >
+          <!-- 抓取按钮组 -->
+          <div class="flex items-center gap-0">
+            <!-- 主抓取按钮 -->
             <UButton
               :loading="downloadBtnLoading"
               :disabled="selectedArticleUrls.length === 0"
-              color="white"
-              class="font-mono"
-              :label="downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : '抓取'"
-              trailing-icon="i-heroicons-chevron-down-20-solid"
+              color="primary"
+              class="font-mono rounded-r-none"
+              :label="downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : `抓取 (${downloadTypes.find(t => t.value === selectedDownloadType)?.label})`"
+              @click="executeDownload"
             />
-          </ButtonGroup>
+            <!-- 下拉选择按钮 -->
+            <UPopover>
+              <UButton
+                :disabled="selectedArticleUrls.length === 0 || downloadBtnLoading"
+                color="primary"
+                class="font-mono rounded-l-none border-l-0"
+                icon="i-heroicons-chevron-down-20-solid"
+              />
+              <template #panel>
+                <div class="p-1">
+                  <button
+                    v-for="type in downloadTypes"
+                    :key="type.value"
+                    @click="selectedDownloadType = type.value"
+                    class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    :class="{
+                      'bg-gray-100 dark:bg-gray-800': selectedDownloadType === type.value
+                    }"
+                  >
+                    {{ type.label }}
+                  </button>
+                </div>
+              </template>
+            </UPopover>
+          </div>
 
-          <ButtonGroup
-            :items="[
-              { label: 'Excel', event: 'export-article-excel' },
-              { label: 'JSON', event: 'export-article-json' },
-              { label: 'HTML', event: 'export-article-html' },
-              { label: 'Txt', event: 'export-article-text' },
-              { label: 'Markdown', event: 'export-article-markdown' },
-            ]"
-            @export-article-excel="exportFile('excel', selectedArticleUrls)"
-            @export-article-json="exportFile('json', selectedArticleUrls)"
-            @export-article-html="exportFile('html', selectedArticleUrls, contentNotDownloadedCount)"
-            @export-article-text="exportFile('text', selectedArticleUrls, contentNotDownloadedCount)"
-            @export-article-markdown="exportFile('markdown', selectedArticleUrls, contentNotDownloadedCount)"
-          >
+          <!-- 导出按钮组 -->
+          <div class="flex items-center gap-0">
+            <!-- 主导出按钮 -->
             <UButton
               :loading="exportBtnLoading"
               :disabled="selectedArticleUrls.length === 0"
               color="white"
-              class="font-mono"
-              :label="exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : '导出'"
-              trailing-icon="i-heroicons-chevron-down-20-solid"
+              class="font-mono rounded-r-none"
+              :label="exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : `导出 (${exportFormats.find(f => f.value === selectedExportFormat)?.label})`"
+              @click="executeExport"
             />
-          </ButtonGroup>
+            <!-- 下拉选择按钮 -->
+            <UPopover>
+              <UButton
+                :disabled="selectedArticleUrls.length === 0 || exportBtnLoading"
+                color="white"
+                class="font-mono rounded-l-none border-l-0"
+                icon="i-heroicons-chevron-down-20-solid"
+              />
+              <template #panel>
+                <div class="p-1">
+                  <button
+                    v-for="format in exportFormats"
+                    :key="format.value"
+                    @click="selectedExportFormat = format.value"
+                    class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    :class="{
+                      'bg-gray-100 dark:bg-gray-800': selectedExportFormat === format.value
+                    }"
+                  >
+                    {{ format.label }}
+                  </button>
+                </div>
+              </template>
+            </UPopover>
+          </div>
 
           <UButton color="rose" variant="soft" :disabled="selectedArticleUrls.length === 0" @click="removeRows">
             移除

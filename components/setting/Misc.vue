@@ -6,6 +6,27 @@
 
     <div class="flex">
       <div class="flex-1 flex flex-col space-y-3">
+        <div>
+          <p class="mb-2 flex items-center gap-3">
+            <span>导出路径:</span>
+            <span class="text-xs text-gray-500">(服务端文件系统路径，所有导出文件将保存到此目录)</span>
+            <UPopover mode="hover" :popper="{ placement: 'top' }">
+              <template #panel>
+                <p class="max-w-[300px] p-3 text-sm text-gray-500">
+                  设置导出文件的服务端保存路径。例如：<code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">./exports</code> 或 <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">/home/user/downloads</code>。<br />
+                  路径相对于项目根目录或使用绝对路径。确保服务端有该目录的写入权限。
+                </p>
+              </template>
+              <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
+            </UPopover>
+          </p>
+          <UInput
+            placeholder="导出路径"
+            v-model="preferences.exportConfig.exportPath"
+            class="w-[600px] font-mono"
+          />
+        </div>
+
         <div class="flex gap-1">
           <UCheckbox v-model="preferences.hideDeleted" name="hideDeleted" label="隐藏已删除文章" />
           <UPopover mode="hover" :popper="{ placement: 'top' }">

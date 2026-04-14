@@ -4,6 +4,7 @@
 
 import Database from 'better-sqlite3';
 import { join } from 'path';
+import { initializeSettingsTable } from '~/server/database/settings';
 import { initializeUserTable } from '~/server/database/user';
 
 let db: Database.Database | null = null;
@@ -68,6 +69,8 @@ function initializeSchema(database: Database.Database) {
       digest TEXT,
       downloaded INTEGER DEFAULT 0,
       is_deleted INTEGER DEFAULT 0,
+      album_id TEXT,
+      appmsg_album_infos TEXT DEFAULT '[]',
       created_at INTEGER DEFAULT (strftime('%s', 'now')),
       updated_at INTEGER DEFAULT (strftime('%s', 'now'))
     );
@@ -75,6 +78,24 @@ function initializeSchema(database: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_articles_key ON articles(key);
     CREATE INDEX IF NOT EXISTS idx_articles_fakeid ON articles(fakeid);
     CREATE INDEX IF NOT EXISTS idx_articles_downloaded ON articles(downloaded);
+  `);
+
+  // 创建文章内容表（HTML）
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS article_html (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT UNIQUE NOT NULL,
+      fakeid TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      comment_id TEXT,
+      downloaded_at INTEGER,
+      created_at INTEGER DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_article_html_url ON article_html(url);
+    CREATE INDEX IF NOT EXISTS idx_article_html_fakeid ON article_html(fakeid);
   `);
 
   // 创建 Cookie 表
@@ -92,6 +113,9 @@ function initializeSchema(database: Database.Database) {
 
   // 创建用户表
   initializeUserTable();
+
+  // 创建设置表
+  initializeSettingsTable();
 }
 
 /**

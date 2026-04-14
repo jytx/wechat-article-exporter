@@ -45,6 +45,7 @@
 <script setup lang="ts">
 import ExternalLink from '~/components/base/ExternalLink.vue';
 import { docsWebSite } from '~/config';
+import usePreferences, { waitForLoaded } from '~/composables/usePreferences';
 import type { Preferences } from '~/types/preferences';
 
 const preferences: Ref<Preferences> = usePreferences() as unknown as Ref<Preferences>;
@@ -57,7 +58,8 @@ const proxyList = computed(() => {
     .filter(line => line.length > 0 && line.startsWith('http'));
 });
 
-onMounted(() => {
+onMounted(async () => {
+  await waitForLoaded();
   try {
     const configuredProxyList = (preferences.value as Preferences).privateProxyList;
     if (configuredProxyList.length > 0) {

@@ -50,7 +50,7 @@
 
 	// 使用 API 获取数据
 	const { getAccounts } = useAccountApi();
-	const { getArticles } = useArticleApi();
+	const { getAlbums } = useArticleApi();
 	const loading = ref(false);
 
 	// 公众号信息（包含合集）
@@ -61,41 +61,27 @@
 	  loading.value = true;
 	  try {
 	    // 获取公众号列表
-	    const accountsResult = await getAccounts({ page: 1, pageSize: 1000 });
+	    const accountsResult = await getAccounts({ page: 1, pageSize: 100000 });
 
 	    // 为每个公众号获取合集信息
 	    const accountsWithAlbums: AccountInfo[] = [];
 	    for (const account of accountsResult.items) {
 	      try {
-	        // 获取该公众号的文章（只需要前100篇来提取合集信息）
-	        const articlesResult = await getArticles({
-	          fakeid: account.fakeid,
-	          page: 1,
-	          pageSize: 100
-	        });
+	        // 直接获取该公众号的合集列表
+	        const albums = await getAlbums(account.fakeid);
 
-	        // 从文章中提取合集信息
-	        const albums: AppMsgAlbumInfo[] = [];
-	        articlesResult.items
-		  .flatMap(article => (article as any).appmsg_album_infos || [])
-		  .forEach((album: AppMsgAlbumInfo) => {
-		    if (!albums.some(a => a.id === album.id)) {
-		      albums.push(album);
+			accountsWithAlbums.push({
+			  ...account,
+			  albums
+			});
+		      } catch (error) {
+			console.error(`获取公众号 [${account.fakeid}] 合集失败:`, error);
+			accountsWithAlbums.push({
+			  ...account,
+			  albums: []
+			});
+		      }
 		    }
-		  });
-
-		accountsWithAlbums.push({
-		  ...account,
-		  albums
-		});
-	      } catch (error) {
-		console.error(`获取公众号 [${account.fakeid}] 合集失败:`, error);
-		accountsWithAlbums.push({
-		  ...account,
-		  albums: []
-		});
-	      }
-	    }
 
 	    accountInfos.value = accountsWithAlbums;
 	  } catch (error) {

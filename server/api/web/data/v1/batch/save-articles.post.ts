@@ -3,10 +3,10 @@
  * POST /api/web/data/v1/batch/save-articles
  */
 
-import { getDatabase } from '~/server/utils/database';
-import { getArticlesByFakeid, saveArticles } from '~/server/database/article';
 import { updateAccountSyncedCount } from '~/server/database/account';
+import { getArticlesByFakeid, saveArticles } from '~/server/database/article';
 import { createApiError, ErrorCodes, successResponse, validateParams } from '~/server/utils/api-response';
+import { getDatabase } from '~/server/utils/database';
 
 interface ArticleInput {
   key: string;
@@ -19,6 +19,8 @@ interface ArticleInput {
   create_time?: number;
   datetime?: string;
   digest?: string;
+  album_id?: string;
+  appmsg_album_infos?: any;
   downloaded?: number;
   is_deleted?: number;
 }
@@ -50,9 +52,7 @@ export default defineEventHandler(async event => {
     const existingKeysStmt = db.prepare(`
       SELECT key FROM articles WHERE fakeid = ?
     `);
-    const existingKeys = new Set(
-      existingKeysStmt.all(fakeid).map((row: any) => row.key)
-    );
+    const existingKeys = new Set(existingKeysStmt.all(fakeid).map((row: any) => row.key));
 
     // 过滤出新文章
     const newArticles = body.articles.filter(article => !existingKeys.has(article.key));

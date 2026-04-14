@@ -4,7 +4,7 @@
       class="rounded-lg divide-y divide-gray-100 dark:divide-gray-800 shadow bg-white dark:bg-gray-900 flex flex-col flex-1 overflow-y-scroll"
     >
       <div class="sticky top-0 bg-white py-4 px-2 shadow">
-        <SearchAccountForm v-model="accountQuery" @search="searchAccount" />
+        <SearchAccountForm ref="searchFormRef" v-model="accountQuery" @search="searchAccount" />
       </div>
       <div class="flex-1">
         <ul class="divide-y antialiased">
@@ -50,16 +50,15 @@ import { Loader } from 'lucide-vue-next';
 import { getAccountList } from '~/apis';
 import LoginModal from '~/components/modal/Login.vue';
 import { ACCOUNT_LIST_PAGE_SIZE, ACCOUNT_TYPE } from '~/config';
+import SearchAccountForm from '~/components/global/SearchAccountForm.vue';
 import type { AccountInfo } from '~/types/types';
 
 const toast = useToast();
 const modal = useModal();
 
 const isOpen = ref(false);
-
-function openSwitcher() {
-  isOpen.value = true;
-}
+const searchFormRef = ref<InstanceType<typeof SearchAccountForm> | null>(null);
+const closeAfterSelect = ref(true);
 
 const accountQuery = ref('');
 const accountList = reactive<AccountInfo[]>([]);
@@ -111,12 +110,21 @@ async function loadData() {
  * 选择公众号
  * @param account
  */
+const emit = defineEmits(['select:account']);
+
 function selectAccount(account: AccountInfo) {
-  isOpen.value = false;
   emit('select:account', account);
+  // 只有当 closeAfterSelect 为 true 时才关闭弹窗
+  if (closeAfterSelect.value) {
+    isOpen.value = false;
+  }
 }
 
-const emit = defineEmits(['select:account']);
+function openSwitcher(closeAfterSelectParam = true) {
+  closeAfterSelect.value = closeAfterSelectParam;
+  isOpen.value = true;
+  searchFormRef.value?.reset();
+}
 
 defineExpose({
   open: openSwitcher,

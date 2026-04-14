@@ -3,18 +3,18 @@
  * GET /api/auth/status
  */
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async event => {
   try {
     // 获取 Session
-    const session = await getSession(event);
+    const session = await getUserSession(event);
 
     if (!session || !session.user) {
       return {
         success: true,
         data: {
           authenticated: false,
-          user: null
-        }
+          user: null,
+        },
       };
     }
 
@@ -28,8 +28,8 @@ export default defineEventHandler(async (event) => {
         success: true,
         data: {
           authenticated: false,
-          user: null
-        }
+          user: null,
+        },
       };
     }
 
@@ -45,11 +45,10 @@ export default defineEventHandler(async (event) => {
         user: {
           id: session.user.id,
           username: session.user.username,
-          role: session.user.role
-        }
-      }
+          role: session.user.role,
+        },
+      },
     };
-
   } catch (error) {
     console.error('检查登录状态失败:', error);
 
@@ -58,8 +57,8 @@ export default defineEventHandler(async (event) => {
       success: true,
       data: {
         authenticated: false,
-        user: null
-      }
+        user: null,
+      },
     };
   }
 });

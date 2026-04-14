@@ -5,8 +5,6 @@ import { filterInvalidFilenameChars, sleep } from '#shared/utils/helpers';
 import { parseCgiDataNew } from '#shared/utils/html';
 import { renderHTMLFromCgiDataNew, renderTextFromCgiDataNew } from '#shared/utils/renderer';
 import usePreferences from '~/composables/usePreferences';
-import { getArticleByLink } from '~/store/v2/article';
-import { getHtmlCache, type HtmlAsset } from '~/store/v2/html';
 import { getAccountNameByFakeid, getAllInfo, type MpAccount } from '~/store/v2/info';
 import { getMetadataCache } from '~/store/v2/metadata';
 import { getResourceCache, updateResourceCache } from '~/store/v2/resource';
@@ -15,6 +13,8 @@ import type { Preferences } from '~/types/preferences';
 import { getArticleComments, renderComments } from '~/utils/comment';
 import { BaseDownloader } from '~/utils/download/BaseDownloader';
 import { type ExcelExportEntity, export2ExcelFile, export2JsonFile } from '~/utils/exporter';
+import { getArticleByLinkFromServer } from '~/utils/server-article';
+import { type ArticleHtmlAsset, getArticleHtmlFromServer } from '~/utils/server-html';
 import type { DownloadOptions } from './types';
 
 // 导出类型
@@ -95,18 +95,18 @@ export class Exporter extends BaseDownloader {
     const parser = new DOMParser();
 
     for (const url of this.urls) {
-      const article = await getArticleByLink(url);
+      const article = await getArticleByLinkFromServer(url);
       if (!article) {
         continue;
       }
 
-      const cached = await getHtmlCache(url);
+      const cached = await getArticleHtmlFromServer(url);
       if (!cached) {
         console.warn(`文章(url: ${url} )的 html 还未下载，不能导出`);
         continue;
       }
 
-      const html = await cached.file.text();
+      const html = cached.content;
       const document = parser.parseFromString(html, 'text/html');
 
       // 该 html 内部的资源，包括图片、背景图片、样式
@@ -267,7 +267,7 @@ export class Exporter extends BaseDownloader {
       const url = this.urls[i];
       console.debug(`(${i + 1}/${total})开始导出: ${url}`);
 
-      const article = await getArticleByLink(url);
+      const article = await getArticleByLinkFromServer(url);
       const accountName = await getAccountNameByFakeid(article.fakeid);
       const exportedArticle: ExcelExportEntity = { ...article, _accountName: accountName };
       if (preferences.value.exportConfig.exportExcelIncludeContent) {
@@ -300,7 +300,7 @@ export class Exporter extends BaseDownloader {
       const url = this.urls[i];
       console.log(`(${i + 1}/${total})开始导出: ${url}`);
 
-      const article = await getArticleByLink(url);
+      const article = await getArticleByLinkFromServer(url);
       const accountName = await getAccountNameByFakeid(article.fakeid);
       const exportedArticle: ExcelExportEntity = { ...article, _accountName: accountName };
 
@@ -336,7 +336,7 @@ export class Exporter extends BaseDownloader {
     await this.processFileExportQueue(
       this.urls,
       async url => {
-        const cached = await getHtmlCache(url);
+        const cached = await getArticleHtmlFromServer(url);
         if (!cached) {
           console.warn(`文章(url: ${url} )的 html 还未下载，不能导出`);
           return;
@@ -345,7 +345,7 @@ export class Exporter extends BaseDownloader {
         const dirname = await this.exportDirName(cached.url);
 
         console.log(`开始导出: ${cached.title}，目录名: ${dirname}`);
-        const html = await cached.file.text();
+        const html = cached.content;
         const resourceMap = await getResourceMapCache(url);
         if (!resourceMap) {
           console.warn(`文章(url: ${url} )的 resource-map 缺失，无法导出`);
@@ -408,7 +408,11 @@ export class Exporter extends BaseDownloader {
 
       const content = await this.getRenderedHTML(url);
       if (!content) return;
-      const markdown = turndownService.turndown(content);
+
+      // 在转 Markdown 前，移除 style 标签和内联样式，避免 CSS 污染输出
+      const cleaned = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '').replace(/\sstyle="[^"]*"/gi, '');
+
+      const markdown = turndownService.turndown(cleaned);
 
       const blob = new Blob([markdown], { type: 'text/markdown' });
       await this.writeFile(filename + '.md', blob);
@@ -442,12 +446,12 @@ export class Exporter extends BaseDownloader {
    * 使用 parseCgiDataNew + renderHTMLFromCgiDataNew 管线
    */
   private async getRenderedHTML(url: string, comments = false): Promise<string> {
-    const cached = await getHtmlCache(url);
+    const cached = await getArticleHtmlFromServer(url);
     if (!cached) {
       console.warn(`文章(url: ${url})的 html 还未下载，不能导出其内容`);
       return '';
     }
-    const html = await cached.file.text();
+    const html = cached.content;
     const cgiData = await parseCgiDataNew(html);
     if (!cgiData) {
       console.warn(`文章(url: ${url})无法解析 cgiDataNew，跳过导出`);
@@ -461,12 +465,12 @@ export class Exporter extends BaseDownloader {
    * 使用 parseCgiDataNew + renderTextFromCgiDataNew 管线
    */
   private async getRenderedText(url: string): Promise<string> {
-    const cached = await getHtmlCache(url);
+    const cached = await getArticleHtmlFromServer(url);
     if (!cached) {
       console.warn(`文章(url: ${url})的 html 还未下载，不能导出其内容`);
       return '';
     }
-    const html = await cached.file.text();
+    const html = cached.content;
     const cgiData = await parseCgiDataNew(html);
     if (!cgiData) {
       console.warn(`文章(url: ${url})无法解析 cgiDataNew，跳过导出`);
@@ -870,7 +874,15 @@ ${commentHTML}
     let dirnameTpl = (preferences.value as Preferences).exportConfig.dirname;
     const maxlength = (preferences.value as Preferences).exportConfig.maxlength;
 
-    const article = await getArticleByLink(articleUrl);
+    const article = await getArticleByLinkFromServer(articleUrl);
+    if (!article) {
+      // 文章不存在时，尝试从 HTML 缓存获取标题
+      const htmlAsset = await getArticleHtmlFromServer(articleUrl);
+      if (htmlAsset?.title) {
+        return filterInvalidFilenameChars(htmlAsset.title);
+      }
+      return filterInvalidFilenameChars(articleUrl.split('/').pop() || 'unknown');
+    }
     const articleUpdateTime = dayjs.unix(article.update_time);
     const account = this.allAccountInfo.find(account => account.fakeid === article.fakeid);
     if (account && account.nickname) {

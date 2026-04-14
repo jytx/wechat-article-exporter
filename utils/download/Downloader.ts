@@ -1,17 +1,18 @@
 import { throwException, timeout } from '#shared/utils/helpers';
 import { parseCgiDataNew, validateHTMLContent } from '#shared/utils/html';
 import usePreferences from '~/composables/usePreferences';
-import { getArticleByLink, getSingleArticleByLink } from '~/store/v2/article';
+import { getSingleArticleByLink } from '~/store/v2/article';
 import { updateCommentCache } from '~/store/v2/comment';
 import { updateCommentReplyCache } from '~/store/v2/comment_reply';
 import { updateDebugCache } from '~/store/v2/debug';
-import { getHtmlCache, updateHtmlCache } from '~/store/v2/html';
 import type { Metadata } from '~/store/v2/metadata';
 import { updateMetadataCache } from '~/store/v2/metadata';
 import type { CommentResponse, ReplyResponse } from '~/types/comment';
 import type { ParsedCredential } from '~/types/credential';
 import type { Preferences } from '~/types/preferences';
 import { BaseDownloader } from '~/utils/download/BaseDownloader';
+import { getArticleByKeyFromServer, getArticleByLinkFromServer } from '~/utils/server-article';
+import { getArticleHtmlFromServer, saveArticleHtmlToServer } from '~/utils/server-html';
 import type { DownloadOptions } from './types';
 
 type DownloadType = 'html' | 'metadata' | 'comments' | 'fakeid';
@@ -148,7 +149,7 @@ export class Downloader extends BaseDownloader {
 
     // html 下载时，需要检查缓存是否可用，避免重复下载相同 html 内容
     if (!preferences.value.downloadConfig.forceDownloadContent) {
-      const cached = await getHtmlCache(url);
+      const cached = await getArticleHtmlFromServer(url);
       if (cached) {
         this.pending.delete(url);
         this.completed.add(url);
@@ -156,11 +157,85 @@ export class Downloader extends BaseDownloader {
       }
     }
 
-    const article = await getArticleByLink(url);
+    let article = await getArticleByLinkFromServer(url);
     if (!article) {
-      this.pending.delete(url);
-      this.failed.add(url);
-      return;
+      // 如果数据库中没有文章记录，检查是否需要解析短链接
+      console.log(`数据库中未找到文章: ${url}，尝试从 URL 构建临时对象`);
+
+      // 如果是 /s/ 格式的短链接（不包含完整参数），先尝试解析
+      const isShortLink = url.includes('/s/') && !url.includes('__biz=');
+
+      if (isShortLink) {
+        console.log(`检测到短链接，尝试解析: ${url}`);
+        try {
+          const resolveResponse = await fetch(`/api/web/misc/resolve-url?url=${encodeURIComponent(url)}`, {
+            credentials: 'include',
+          });
+          const resolveData = await resolveResponse.json();
+
+          if (resolveData.success && resolveData.data && !resolveData.data.partial) {
+            // 解析成功，使用解析出的完整链接继续
+            const resolvedUrl = resolveData.data.fullUrl;
+            console.log(`✅ 短链接解析成功，使用完整链接: ${resolvedUrl}`);
+
+            // 用完整链接重新查询数据库
+            article = await getArticleByLinkFromServer(resolvedUrl);
+
+            if (!article) {
+              // 如果还是没有，构建临时对象
+              article = {
+                fakeid: resolveData.data.fakeid,
+                appmsgid: resolveData.data.appmsgid,
+                itemidx: resolveData.data.itemidx,
+                aid: `${resolveData.data.appmsgid}_${resolveData.data.itemidx}`,
+                title: resolveData.data.title || '',
+                is_pay_subscribe: 0,
+              } as any;
+              console.log(`✅ 从解析结果构建临时文章对象`);
+            }
+          } else {
+            console.warn(`⚠️ 短链接解析失败或仅部分成功`);
+            throw new Error(`无法解析短链接: ${url}`);
+          }
+        } catch (error) {
+          console.error(`❌ 解析短链接失败:`, error);
+          this.pending.delete(url);
+          this.failed.add(url);
+          return;
+        }
+      } else {
+        // 不是短链接，尝试从 URL 参数中构建临时文章对象
+        try {
+          const urlObj = new URL(url);
+          const fakeid = urlObj.searchParams.get('__biz');
+          const mid = urlObj.searchParams.get('mid');
+          const idx = urlObj.searchParams.get('idx');
+
+          console.log(`URL 参数解析结果: fakeid=${fakeid}, mid=${mid}, idx=${idx}`);
+
+          if (fakeid && mid) {
+            article = {
+              fakeid: fakeid,
+              appmsgid: Number(mid),
+              itemidx: Number(idx) || 1,
+              aid: `${mid}_${idx || 1}`,
+              title: '',
+              is_pay_subscribe: 0,
+            } as any;
+            console.log(`✅ 从 URL 构建临时文章对象成功: ${url}`);
+          } else {
+            console.warn(`❌ 无法从 URL 解析文章参数，且数据库中无记录: ${url}`);
+            this.pending.delete(url);
+            this.failed.add(url);
+            return;
+          }
+        } catch (error) {
+          console.error(`❌ 解析 URL 失败: ${url}`, error);
+          this.pending.delete(url);
+          this.failed.add(url);
+          return;
+        }
+      }
     }
 
     // 付费文章需要使用 credential 来获取完整内容
@@ -174,14 +249,16 @@ export class Downloader extends BaseDownloader {
         const html = await blob.text();
         const [status, commentID] = validateHTMLContent(html);
         if (status === 'Success') {
-          // 下载成功
-          await updateHtmlCache({
+          // 下载成功，保存到服务端
+          console.log(`✅ 下载成功，准备保存 HTML: ${url}`);
+          await saveArticleHtmlToServer({
             fakeid: article.fakeid,
             url: url,
             title: article.title,
-            file: blob,
-            commentID,
+            content: html, // 保存 HTML 字符串而不是 Blob
+            comment_id: commentID,
           });
+          console.log(`✅ HTML 保存成功: ${url}`);
           this.pending.delete(url);
           this.completed.add(url);
           this.proxyManager.recordSuccess(proxy);
@@ -242,7 +319,7 @@ export class Downloader extends BaseDownloader {
   private async downloadMetadataTask(url: string): Promise<void> {
     this.pending.add(url);
 
-    const article = await getArticleByLink(url);
+    const article = await getArticleByLinkFromServer(url);
     if (!article) {
       this.pending.delete(url);
       this.failed.add(url);
@@ -271,12 +348,12 @@ export class Downloader extends BaseDownloader {
 
           // 抓取阅读量时，将带有阅读量的html更新到缓存
           if (preferences.value.downloadConfig.metadataOverrideContent) {
-            await updateHtmlCache({
+            await saveArticleHtmlToServer({
               fakeid: article.fakeid,
               url: url,
               title: article.title,
-              file: blob,
-              commentID,
+              content: html,
+              comment_id: commentID,
             });
           }
           this.pending.delete(url);
@@ -339,7 +416,7 @@ export class Downloader extends BaseDownloader {
   private async downloadCommentsTask(url: string): Promise<void> {
     this.pending.add(url);
 
-    const article = await getArticleByLink(url);
+    const article = await getArticleByLinkFromServer(url);
     if (!article) {
       this.pending.delete(url);
       this.failed.add(url);
@@ -356,7 +433,7 @@ export class Downloader extends BaseDownloader {
     }
 
     // 留言数据不进行缓存
-    const cached = await getHtmlCache(url);
+    const cached = await getArticleHtmlFromServer(url);
     if (!cached) {
       // 文章还未下载，不能下载留言
       this.pending.delete(url);
@@ -375,7 +452,14 @@ export class Downloader extends BaseDownloader {
         const proxy = this.proxyManager.getBestProxy();
 
         try {
-          const response = await this.fetchComments(article.fakeid, cached.commentID!, buffer, proxy, article.appmsgid, article.itemidx);
+          const response = await this.fetchComments(
+            article.fakeid,
+            cached.comment_id!,
+            buffer,
+            proxy,
+            article.appmsgid,
+            article.itemidx
+          );
           this.proxyManager.recordSuccess(proxy);
 
           if (response.base_resp.ret === 0) {
@@ -386,7 +470,7 @@ export class Downloader extends BaseDownloader {
             continue download_comment;
           } else {
             // 留言下载失败
-            throwException(`文章(url: ${url} )的评论(${cached.commentID})获取失败`);
+            throwException(`文章(url: ${url} )的评论(${cached.comment_id})获取失败`);
           }
         } catch (error) {
           await this.handleDownloadFailure(proxy, url, attempt, error);
@@ -418,7 +502,7 @@ export class Downloader extends BaseDownloader {
         try {
           const response = await this.fetchCommentReply(
             article.fakeid,
-            cached.commentID!,
+            cached.comment_id!,
             comment.content_id,
             comment.reply_new.max_reply_id,
             proxy,
@@ -439,7 +523,7 @@ export class Downloader extends BaseDownloader {
             continue download_comment_reply;
           } else {
             // 留言下载失败
-            throwException(`文章(url: ${url} )的评论回复(${cached.commentID})获取失败`);
+            throwException(`文章(url: ${url} )的评论回复(${cached.comment_id})获取失败`);
           }
         } catch (error) {
           await this.handleDownloadFailure(proxy, url, attempt, error);
@@ -478,8 +562,9 @@ export class Downloader extends BaseDownloader {
       const Authorization = (preferences.value as Preferences).privateProxyAuthorization || '';
       const url = `https://mp.weixin.qq.com/mp/appmsg_comment?action=getcomment&scene=0&appmsgid=${appmsgid}&idx=${itemidx}&__biz=${targetCredential.biz}&comment_id=${commentID}&uin=${targetCredential.uin}&key=${targetCredential.key}&pass_ticket=${encodeURIComponent(targetCredential.pass_ticket)}&appmsg_token=${encodeURIComponent(targetCredential.appmsg_token)}&wxtoken=777&devicetype=UnifiedPCMac&comment_scene=0&buffer=${buffer}&offset=0&limit=100&x5=0&f=json`;
       const headers: Record<string, string> = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 MicroMessenger/6.8.0(0x16080000) NetType/WIFI MiniProgramEnv/Mac MacWechat/WECHAT/WeChatBrowser XWEB/1191',
-        'Referer': 'https://mp.weixin.qq.com/',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 MicroMessenger/6.8.0(0x16080000) NetType/WIFI MiniProgramEnv/Mac MacWechat/WECHAT/WeChatBrowser XWEB/1191',
+        Referer: 'https://mp.weixin.qq.com/',
       };
       if (targetCredential.cookie) {
         headers.Cookie = targetCredential.cookie;
@@ -526,8 +611,9 @@ export class Downloader extends BaseDownloader {
       const Authorization = (preferences.value as Preferences).privateProxyAuthorization || '';
       const url = `https://mp.weixin.qq.com/mp/appmsg_comment?action=getcommentreply&scene=0&appmsgid=${appmsgid}&idx=${itemidx}&__biz=${targetCredential.biz}&comment_id=${commentID}&uin=${targetCredential.uin}&key=${targetCredential.key}&pass_ticket=${encodeURIComponent(targetCredential.pass_ticket)}&appmsg_token=${encodeURIComponent(targetCredential.appmsg_token)}&wxtoken=777&devicetype=UnifiedPCMac&content_id=${contentID}&max_reply_id=${maxReplyID}&limit=100&x5=0&f=json`;
       const headers: Record<string, string> = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 MicroMessenger/6.8.0(0x16080000) NetType/WIFI MiniProgramEnv/Mac MacWechat/WECHAT/WeChatBrowser XWEB/1191',
-        'Referer': 'https://mp.weixin.qq.com/',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 MicroMessenger/6.8.0(0x16080000) NetType/WIFI MiniProgramEnv/Mac MacWechat/WECHAT/WeChatBrowser XWEB/1191',
+        Referer: 'https://mp.weixin.qq.com/',
       };
       if (targetCredential.cookie) {
         headers.Cookie = targetCredential.cookie;
@@ -580,7 +666,7 @@ export class Downloader extends BaseDownloader {
       return;
     }
 
-    const article = await getArticleByLink(url);
+    const article = await getArticleByLinkFromServer(url);
 
     // 写入元数据表
     const metadata: Metadata = {

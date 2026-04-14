@@ -8,15 +8,15 @@ interface ChangePasswordBody {
   new_password: string;
 }
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async event => {
   try {
     // 获取当前用户
-    const session = await getSession(event);
+    const session = await getUserSession(event);
 
     if (!session?.user) {
       throw createError({
         statusCode: 401,
-        message: '未认证'
+        message: '未认证',
       });
     }
 
@@ -27,17 +27,12 @@ export default defineEventHandler(async (event) => {
     if (!old_password || !new_password) {
       throw createError({
         statusCode: 400,
-        message: '旧密码和新密码不能为空'
+        message: '旧密码和新密码不能为空',
       });
     }
 
     // 导入相关函数
-    const {
-      findUserByUsername,
-      verifyPassword,
-      hashPassword,
-      isValidPassword
-    } = await import('~/server/utils/users');
+    const { findUserByUsername, verifyPassword, hashPassword, isValidPassword } = await import('~/server/utils/users');
 
     // 查找用户
     const user = findUserByUsername(session.user.username);
@@ -45,7 +40,7 @@ export default defineEventHandler(async (event) => {
     if (!user) {
       throw createError({
         statusCode: 404,
-        message: '用户不存在'
+        message: '用户不存在',
       });
     }
 
@@ -55,7 +50,7 @@ export default defineEventHandler(async (event) => {
     if (!isOldPasswordValid) {
       throw createError({
         statusCode: 400,
-        message: '旧密码错误'
+        message: '旧密码错误',
       });
     }
 
@@ -65,7 +60,7 @@ export default defineEventHandler(async (event) => {
     if (isSamePassword) {
       throw createError({
         statusCode: 400,
-        message: '新密码不能与旧密码相同'
+        message: '新密码不能与旧密码相同',
       });
     }
 
@@ -75,7 +70,7 @@ export default defineEventHandler(async (event) => {
     if (!passwordValidation.valid) {
       throw createError({
         statusCode: 400,
-        message: passwordValidation.errors.join('; ')
+        message: passwordValidation.errors.join('; '),
       });
     }
 
@@ -91,9 +86,8 @@ export default defineEventHandler(async (event) => {
 
     return {
       success: true,
-      message: '密码修改成功'
+      message: '密码修改成功',
     };
-
   } catch (error) {
     // 如果是已知的错误，直接抛出
     if (error && typeof error === 'object' && 'statusCode' in error) {
@@ -104,7 +98,7 @@ export default defineEventHandler(async (event) => {
     console.error('修改密码失败:', error);
     throw createError({
       statusCode: 500,
-      message: '修改密码失败，请稍后重试'
+      message: '修改密码失败，请稍后重试',
     });
   }
 });

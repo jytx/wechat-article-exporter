@@ -52,6 +52,12 @@ export interface BatchUpdateParams {
   };
 }
 
+export interface AppMsgAlbumInfo {
+  id: string;
+  title: string;
+  album_id: number;
+}
+
 /**
  * 文章 API Composable
  */
@@ -140,6 +146,13 @@ export function useArticleApi() {
     });
   }
 
+  /**
+   * 获取公众号的合集列表
+   */
+  async function getAlbums(fakeid: string): Promise<AppMsgAlbumInfo[]> {
+    return await api.get<AppMsgAlbumInfo[]>('/albums', { fakeid });
+  }
+
   return {
     getArticles,
     getArticle,
@@ -149,6 +162,7 @@ export function useArticleApi() {
     batchMarkAsDownloaded,
     batchMarkAsDeleted,
     batchRestore,
+    getAlbums,
   };
 }
 

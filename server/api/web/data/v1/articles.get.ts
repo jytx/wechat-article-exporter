@@ -81,6 +81,19 @@ export default defineEventHandler(async event => {
       console.log(`[articles.get] 分页返回: ${articles.length} 条, 总数: ${total}`);
     }
 
+    // 解析 appmsg_album_infos JSON 字符串为数组
+    articles = articles.map(article => {
+      if (article.appmsg_album_infos && typeof article.appmsg_album_infos === 'string') {
+        try {
+          article.appmsg_album_infos = JSON.parse(article.appmsg_album_infos);
+        } catch (e) {
+          console.error('解析 appmsg_album_infos 失败:', e);
+          article.appmsg_album_infos = [];
+        }
+      }
+      return article;
+    });
+
     // 根据状态过滤
     let filtered = articles;
 

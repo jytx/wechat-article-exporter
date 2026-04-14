@@ -30,3 +30,8 @@ samples/**/output
 # wrangler
 .wrangler
 CLAUDE.md
+
+# Agent tools
+agent-harness
+.spec-workflow
+.claude/scheduled_tasks.lock

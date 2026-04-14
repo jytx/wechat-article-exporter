@@ -3,10 +3,9 @@
  * 在服务器启动时从 SQLite 数据库加载 cookie 数据到内存
  */
 
-import { cookieStore } from './CookieStore';
-import type { AccountCookie } from './CookieStore';
 import type { CookieKVValue } from '~/server/database/cookie';
 import { getAllCookies } from '~/server/database/cookie';
+import { AccountCookie, cookieStore } from './CookieStore';
 
 /**
  * 预热 CookieStore

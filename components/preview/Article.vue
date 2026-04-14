@@ -12,7 +12,7 @@ import { renderHTMLFromCgiDataNew } from '#shared/utils/renderer';
 import HtmlRenderer from '~/components/preview/HtmlRenderer.vue';
 import toastFactory from '~/composables/toast';
 import usePreferences from '~/composables/usePreferences';
-import { getHtmlCache, type HtmlAsset } from '~/store/v2/html';
+import { getArticleHtmlFromServer, type ArticleArticleHtmlAsset } from '~/utils/server-html';
 import { getMetadataCache } from '~/store/v2/metadata';
 import type { Preferences } from '~/types/preferences';
 import type { AppMsgEx } from '~/types/types';
@@ -28,10 +28,13 @@ const isOpen = ref(false);
 const articleHtml = ref('');
 
 async function open(article: AppMsgEx) {
-  const htmlAsset = await getHtmlCache(article.link);
+  const htmlAsset = await getArticleHtmlFromServer(article.link);
   if (htmlAsset) {
     isOpen.value = true;
-    const rawHtml = await htmlAsset.file.text();
+    const rawHtml = htmlAsset.content;
+    console.log('rawHtml type:', typeof rawHtml);
+    console.log('rawHtml length:', rawHtml?.length);
+    console.log('rawHtml preview:', rawHtml?.substring(0, 200));
     const cgiData = await parseCgiDataNew(rawHtml);
     console.log(cgiData);
 
@@ -48,7 +51,7 @@ async function open(article: AppMsgEx) {
 const preferences: Ref<Preferences> = usePreferences() as unknown as Ref<Preferences>;
 
 // 调整最终的 html
-async function normalizeHtmlForPreview(cachedHtml: HtmlAsset, html: string): Promise<string> {
+async function normalizeHtmlForPreview(cachedHtml: ArticleHtmlAsset, html: string): Promise<string> {
   const parser = new DOMParser();
   const document = parser.parseFromString(html, 'text/html');
   const $jsArticleContent = document.querySelector('#js_article')!;
