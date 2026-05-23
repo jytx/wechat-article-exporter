@@ -151,7 +151,7 @@ export class BaseDownloader {
     }
   }
 
-  // 下载
+  // 下载（不依赖 fakeid 的新版本）
   protected async download(fakeid: string, url: string, proxy: string, withCredential = false): Promise<Blob> {
     const abortController = new AbortController();
     this.abortControllers.set(url, abortController);
@@ -159,7 +159,7 @@ export class BaseDownloader {
     try {
       const headers: Record<string, string> = {};
 
-      // 使用设置的 credentials 来抓取元数据
+      // 使用设置的 credentials 来抓取元数据（仅付费文章需要）
       if (withCredential) {
         const targetCredential = credentials.value.find(item => item.biz === fakeid && item.valid);
         if (targetCredential) {
@@ -170,12 +170,12 @@ export class BaseDownloader {
       // 优先使用本地后端代理（避免 CORS 和限流问题）
       try {
         const localProxyUrl = `/api/proxy/article-html?url=${encodeURIComponent(url)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
-        const localResponse = await Promise.race([
+        const localResponse = (await Promise.race([
           fetch(localProxyUrl, {
             signal: abortController.signal,
           }),
           timeout(this.options.timeout),
-        ]) as Response;
+        ])) as Response;
 
         if (localResponse.ok) {
           const blob = await localResponse.blob();
@@ -204,6 +204,11 @@ export class BaseDownloader {
     } finally {
       this.abortControllers.delete(url);
     }
+  }
+
+  // 简化版下载：直接用 URL，不需要 fakeid
+  protected async downloadByURL(url: string, proxy: string): Promise<Blob> {
+    return this.download('', url, proxy, false);
   }
 
   // 验证输入 urls 是否全部合法

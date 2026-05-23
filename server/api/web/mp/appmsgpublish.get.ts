@@ -42,7 +42,7 @@ export default defineEventHandler(async event => {
     ajax: 1,
   };
 
-  return proxyMpRequest({
+  const res = await proxyMpRequest({
     event: event,
     method: 'GET',
     endpoint: 'https://mp.weixin.qq.com/cgi-bin/appmsgpublish',
@@ -57,4 +57,5 @@ export default defineEventHandler(async event => {
       },
     };
   });
+  return res;
 });

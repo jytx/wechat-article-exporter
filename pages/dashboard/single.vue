@@ -20,6 +20,7 @@ import GridArticleActions from '~/components/grid/ArticleActions.vue';
 import GridLoading from '~/components/grid/Loading.vue';
 import GridNoRows from '~/components/grid/NoRows.vue';
 import PreviewArticle from '~/components/preview/Article.vue';
+import SearchArticleDialog from '~/components/global/SearchArticleDialog.vue';
 import toastFactory from '~/composables/toast';
 import { websiteName } from '~/config';
 import { sharedGridOptions } from '~/config/shared-grid-options';
@@ -61,6 +62,9 @@ const preferences = usePreferences();
 
 const toast = toastFactory();
 const inputUrl = ref('');
+
+// 搜索文章对话框
+const searchArticleDialogRef = ref<InstanceType<typeof SearchArticleDialog> | null>(null);
 
 const globalRowData = useLocalStorage<SingleArticleRow[]>('single-article:rows', []);
 if (!globalRowData.value) {
@@ -313,64 +317,39 @@ async function addArticle() {
     let originalUrl = normalizeUrl(inputUrl.value);
     console.log('添加文章，原始 URL:', originalUrl);
 
-    // 检查是否是 /s/ 格式且缺少完整参数的短链接
-    const needsResolution = originalUrl.includes('/s/') && !originalUrl.includes('__biz=');
-    console.log('是否需要解析:', needsResolution);
-
     let finalUrl = originalUrl;
     let resolvedTitle = '';
 
-    if (needsResolution) {
-      toast.info('提示', '正在解析分享链接...');
-      console.log('🔍 调用解析 API:', `/api/web/misc/resolve-url?url=${encodeURIComponent(originalUrl)}`);
+    // 尝试解析标题（可选，不影响核心功能）
+    const isShortLink = originalUrl.includes('/s/') && !originalUrl.includes('__biz=');
+
+    if (isShortLink) {
+      console.log('检测到短链接，尝试获取标题');
       try {
         const response = await fetch(`/api/web/misc/resolve-url?url=${encodeURIComponent(originalUrl)}`, {
           credentials: 'include',
         });
-        console.log('📡 API 响应状态:', response.status, response.statusText);
         const data = await response.json();
-        console.log('解析 API 响应:', data);
-        if (data.success && data.data) {
-          // 使用解析出的完整链接
-          finalUrl = data.data.fullUrl;
-          resolvedTitle = data.data.title || '';
-          console.log('✅ 解析成功，完整链接:', finalUrl, '标题:', resolvedTitle);
 
-          // 如果是部分成功（只有标题，没有完整链接）
-          if (data.data.partial) {
-            console.log('⚠️ 部分成功：只提取到标题，使用原始链接');
-            finalUrl = originalUrl;
-          }
-
-          // 先检查完整链接是否已存在
-          if (globalRowData.value.some(row => row.link === finalUrl)) {
-            toast.info('提示', '该文章已存在列表中');
-            return;
-          }
-        } else {
-          // 解析失败，使用原始链接继续尝试
-          console.warn('⚠️ 解析分享链接失败，使用原始链接继续');
-          console.warn('错误信息:', data);
-          finalUrl = originalUrl;
+        if (data.success && data.data && data.data.title) {
+          resolvedTitle = data.data.title;
+          console.log('✅ 获取到标题:', resolvedTitle);
         }
-      } catch (error: any) {
-        // 解析出错，使用原始链接继续尝试
-        console.warn('⚠️ 解析分享链接出错:', error?.message, '使用原始链接继续');
-        console.error('完整错误:', error);
-        finalUrl = originalUrl;
-      }
-    } else {
-      // 不是短链接，直接检查是否存在
-      if (globalRowData.value.some(row => row.link === finalUrl)) {
-        toast.info('提示', '该链接已存在列表中');
-        return;
+      } catch (error) {
+        console.log('获取标题失败，将使用默认标题:', error);
       }
     }
 
-    // 使用最终确定的 URL（可能是解析后的完整链接，也可能是原始链接）创建行
+    // 先检查是否已存在
+    if (globalRowData.value.some(row => row.link === finalUrl)) {
+      toast.info('提示', '该链接已存在列表中');
+      return;
+    }
+
+    // 使用 URL 创建行（不需要 fakeid 等参数）
     const row = createRow(finalUrl);
 
-    // 如果解析出了标题，直接使用
+    // 如果解析出了标题，使用解析出的值
     if (resolvedTitle) {
       row.title = resolvedTitle;
     }
@@ -384,6 +363,64 @@ async function addArticle() {
   } catch (error: any) {
     console.error('添加文章失败:', error);
     toast.error('添加失败', error?.message || '链接格式不正确');
+  }
+}
+
+/**
+ * 打开搜索文章对话框
+ */
+function openSearchDialog() {
+  searchArticleDialogRef.value?.open();
+}
+
+/**
+ * 从搜索结果选择文章并添加到列表
+ */
+async function selectArticleFromSearch(article: any) {
+  try {
+    console.log('从搜索结果选择文章:', article);
+
+    // 创建行数据
+    const row = createRow(article.link);
+
+    // 使用搜索结果的标题和参数
+    row.title = article.title || '';
+    if (article.fakeid) {
+      row.fakeid = article.fakeid;
+    }
+    if (article.appmsgid) {
+      row.appmsgid = article.appmsgid;
+    }
+    if (article.itemidx) {
+      row.itemidx = article.itemidx;
+    }
+    // 更新 aid
+    if (row.appmsgid && row.itemidx) {
+      row.aid = `${row.appmsgid}_${row.itemidx}`;
+    }
+
+    // 如果有公众号名称，也保存
+    if (article.account_nickname) {
+      row.accountName = article.account_nickname;
+    }
+
+    console.log('创建的行数据:', row);
+
+    // 检查是否已存在
+    if (globalRowData.value.some(r => r.link === row.link)) {
+      toast.info('提示', '该文章已存在列表中');
+      return;
+    }
+
+    // 添加到列表
+    globalRowData.value = [row, ...globalRowData.value];
+    await upsertArticleStub(row);
+    refreshGrid();
+
+    toast.success('添加成功', `"${article.title}" 已添加到列表`);
+  } catch (error: any) {
+    console.error('从搜索添加文章失败:', error);
+    toast.error('添加失败', error?.message || '添加失败');
   }
 }
 
@@ -774,9 +811,10 @@ async function removeRows() {
     <div class="flex flex-col h-full divide-y divide-gray-200">
       <!-- 顶部操作区 -->
       <header class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-3 py-3">
-        <div class="flex flex-1 gap-3">
-          <UInput v-model="inputUrl" placeholder="请输入公众号文章链接" class="flex-1" @keyup.enter="addArticle" />
+        <div class="flex items-center gap-3">
+          <UInput v-model="inputUrl" placeholder="请输入公众号文章链接" class="w-64 lg:w-96" @keyup.enter="addArticle" />
           <UButton color="blue" @click="addArticle">添加</UButton>
+          <UButton color="white" @click="openSearchDialog">搜索</UButton>
         </div>
         <div class="flex items-center gap-3">
           <!-- 抓取按钮组 -->
@@ -871,5 +909,8 @@ async function removeRows() {
     </div>
 
     <PreviewArticle ref="previewArticleRef" />
+
+    <!-- 搜索文章对话框 -->
+    <SearchArticleDialog ref="searchArticleDialogRef" @select:article="selectArticleFromSearch" />
   </div>
 </template>

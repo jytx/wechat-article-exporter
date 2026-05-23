@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { USER_AGENT } from '~/config';
+import { getCookieFromStore } from '~/server/utils/CookieStore';
 
 interface ResolveUrlQuery {
   url: string;
@@ -41,12 +42,24 @@ export default defineEventHandler(async event => {
   try {
     console.log('[resolve-url] 开始解析链接:', url);
 
+    // 从 CookieStore 获取登录后的 Cookie
+    const wechatCookie = await getCookieFromStore(event);
+    console.log('[resolve-url] 从 CookieStore 获取到的 Cookie 长度:', wechatCookie?.length || 0);
+
+    const headers: Record<string, string> = {
+      Referer: 'https://mp.weixin.qq.com/',
+      Origin: 'https://mp.weixin.qq.com',
+      'User-Agent': USER_AGENT,
+    };
+
+    // 如果有登录后的 Cookie，使用它
+    if (wechatCookie) {
+      headers.Cookie = wechatCookie;
+      console.log('[resolve-url] 使用登录后的 Cookie 访问短链接');
+    }
+
     const response = await fetch(url, {
-      headers: {
-        Referer: 'https://mp.weixin.qq.com/',
-        Origin: 'https://mp.weixin.qq.com',
-        'User-Agent': USER_AGENT,
-      },
+      headers,
       redirect: 'follow', // 跟随重定向
     });
 
@@ -144,7 +157,42 @@ export default defineEventHandler(async event => {
     // 尝试从 HTML 中直接搜索 __biz 参数
     console.log('[resolve-url] 在 HTML 中搜索 __biz 参数');
 
-    // 在整个 HTML 中搜索 __biz= 格式
+    // 策略1: 尝试从 window.cgiData 中提取（最可靠）
+    const cgiDataMatch = rawHtml.match(/window\.cgiData\s*=\s*({[\s\S]*?});?\s*<\/script>/);
+    if (cgiDataMatch) {
+      console.log('[resolve-url] 找到 window.cgiData');
+      try {
+        // 清理可能的JSON问题
+        const jsonStr = cgiDataMatch[1].replace(/:\s*undefined/g, ':null');
+        const cgiData = JSON.parse(jsonStr);
+
+        if (cgiData && cgiData.bizuin) {
+          const fakeid = cgiData.bizuin;
+          const appmsgid = cgiData.appmsgid || cgiData.mid || cgiData.appMsgInfo?.appId || '';
+          const itemidx = cgiData.itemidx || cgiData.idx || cgiData.appMsgInfo?.itemIdx || 1;
+
+          console.log('[resolve-url] ✅ 从 cgiData 提取参数:', { fakeid, appmsgid, itemidx });
+
+          if (fakeid && appmsgid) {
+            return {
+              success: true,
+              data: {
+                originalUrl: url,
+                fullUrl: url, // 使用原始链接
+                fakeid: fakeid,
+                appmsgid: Number(appmsgid),
+                itemidx: Number(itemidx) || 1,
+                title: ogTitle,
+              },
+            };
+          }
+        }
+      } catch (e) {
+        console.log('[resolve-url] 解析 cgiData 失败:', e.message);
+      }
+    }
+
+    // 策略2: 在整个 HTML 中搜索 __biz= 格式
     const allBizMatches = rawHtml.match(/__biz=(?:")?([^&"'\s${}]+)(?:")?/g) || [];
     console.log('[resolve-url] 找到的所有 __biz 候选:', allBizMatches.slice(0, 10));
 

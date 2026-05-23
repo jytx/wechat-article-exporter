@@ -143,7 +143,7 @@ export class Downloader extends BaseDownloader {
     this.failed.add(url);
   }
 
-  // 下载 HTML 任务
+  // 下载 HTML 任务（简化版：不依赖 fakeid，直接用 URL）
   private async downloadHTMLTask(url: string): Promise<void> {
     this.pending.add(url);
 
@@ -157,117 +157,69 @@ export class Downloader extends BaseDownloader {
       }
     }
 
-    let article = await getArticleByLinkFromServer(url);
-    if (!article) {
-      // 如果数据库中没有文章记录，检查是否需要解析短链接
-      console.log(`数据库中未找到文章: ${url}，尝试从 URL 构建临时对象`);
+    // 简化：直接使用 URL 下载，不依赖 fakeid
+    // 核心思路：只要有 URL，就能获取 HTML，不需要 fakeid
+    console.log(`开始下载文章 HTML: ${url}`);
 
-      // 如果是 /s/ 格式的短链接（不包含完整参数），先尝试解析
-      const isShortLink = url.includes('/s/') && !url.includes('__biz=');
+    let title = '';
+    let fakeid = '';
 
-      if (isShortLink) {
-        console.log(`检测到短链接，尝试解析: ${url}`);
-        try {
-          const resolveResponse = await fetch(`/api/web/misc/resolve-url?url=${encodeURIComponent(url)}`, {
-            credentials: 'include',
-          });
-          const resolveData = await resolveResponse.json();
-
-          if (resolveData.success && resolveData.data && !resolveData.data.partial) {
-            // 解析成功，使用解析出的完整链接继续
-            const resolvedUrl = resolveData.data.fullUrl;
-            console.log(`✅ 短链接解析成功，使用完整链接: ${resolvedUrl}`);
-
-            // 用完整链接重新查询数据库
-            article = await getArticleByLinkFromServer(resolvedUrl);
-
-            if (!article) {
-              // 如果还是没有，构建临时对象
-              article = {
-                fakeid: resolveData.data.fakeid,
-                appmsgid: resolveData.data.appmsgid,
-                itemidx: resolveData.data.itemidx,
-                aid: `${resolveData.data.appmsgid}_${resolveData.data.itemidx}`,
-                title: resolveData.data.title || '',
-                is_pay_subscribe: 0,
-              } as any;
-              console.log(`✅ 从解析结果构建临时文章对象`);
-            }
-          } else {
-            console.warn(`⚠️ 短链接解析失败或仅部分成功`);
-            throw new Error(`无法解析短链接: ${url}`);
-          }
-        } catch (error) {
-          console.error(`❌ 解析短链接失败:`, error);
-          this.pending.delete(url);
-          this.failed.add(url);
-          return;
-        }
-      } else {
-        // 不是短链接，尝试从 URL 参数中构建临时文章对象
-        try {
-          const urlObj = new URL(url);
-          const fakeid = urlObj.searchParams.get('__biz');
-          const mid = urlObj.searchParams.get('mid');
-          const idx = urlObj.searchParams.get('idx');
-
-          console.log(`URL 参数解析结果: fakeid=${fakeid}, mid=${mid}, idx=${idx}`);
-
-          if (fakeid && mid) {
-            article = {
-              fakeid: fakeid,
-              appmsgid: Number(mid),
-              itemidx: Number(idx) || 1,
-              aid: `${mid}_${idx || 1}`,
-              title: '',
-              is_pay_subscribe: 0,
-            } as any;
-            console.log(`✅ 从 URL 构建临时文章对象成功: ${url}`);
-          } else {
-            console.warn(`❌ 无法从 URL 解析文章参数，且数据库中无记录: ${url}`);
-            this.pending.delete(url);
-            this.failed.add(url);
-            return;
-          }
-        } catch (error) {
-          console.error(`❌ 解析 URL 失败: ${url}`, error);
-          this.pending.delete(url);
-          this.failed.add(url);
-          return;
-        }
-      }
+    // 尝试从数据库获取文章信息（如果有）
+    const article = await getArticleByLinkFromServer(url);
+    if (article) {
+      title = article.title || '';
+      fakeid = article.fakeid || '';
     }
-
-    // 付费文章需要使用 credential 来获取完整内容
-    const withCredential = article.is_pay_subscribe === 1;
 
     for (let attempt = 0; attempt < this.options.maxRetries; attempt++) {
       const proxy = this.proxyManager.getBestProxy();
 
       try {
-        const blob = await this.download(article.fakeid, url, proxy, withCredential);
+        // 直接用 URL 下载，不需要 fakeid
+        const blob = await this.downloadByURL(url, proxy);
         const html = await blob.text();
         const [status, commentID] = validateHTMLContent(html);
+
         if (status === 'Success') {
+          // 尝试从 HTML 中提取标题（如果还没有）
+          if (!title) {
+            const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/);
+            if (titleMatch && titleMatch[1]) {
+              title = titleMatch[1];
+            }
+          }
+
+          // 尝试从 HTML 中提取 fakeid（用于调试和分类）
+          if (!fakeid) {
+            const cgiData = await parseCgiDataNew(html);
+            if (cgiData && cgiData.bizuin) {
+              fakeid = cgiData.bizuin;
+            }
+          }
+
           // 下载成功，保存到服务端
           console.log(`✅ 下载成功，准备保存 HTML: ${url}`);
           await saveArticleHtmlToServer({
-            fakeid: article.fakeid,
+            fakeid: fakeid || 'UNKNOWN',
             url: url,
-            title: article.title,
-            content: html, // 保存 HTML 字符串而不是 Blob
+            title: title,
+            content: html,
             comment_id: commentID,
           });
           console.log(`✅ HTML 保存成功: ${url}`);
+
+          // 如果成功提取到了 fakeid，通知前端更新
+          if (fakeid && fakeid !== 'UNKNOWN') {
+            this.emit('fix:fakeid', url, fakeid);
+          }
+
           this.pending.delete(url);
           this.completed.add(url);
           this.proxyManager.recordSuccess(proxy);
           return;
         } else if (status === 'Deleted') {
           // 文章被删除
-          console.warn(`文章(url: ${url} )已被删除`);
-
-          // 通知外边更新删除状态
+          console.warn(`文章(url: ${url}) 已被删除`);
           this.emit('download:deleted', url);
           this.pending.delete(url);
           this.deleted.add(url);
@@ -275,9 +227,7 @@ export class Downloader extends BaseDownloader {
           return;
         } else if (status === 'Exception' && commentID) {
           // 文章状态异常
-          console.warn(`文章(url: ${url} )状态异常: ${commentID}`);
-
-          // 通知外边更新文章状态
+          console.warn(`文章(url: ${url}) 状态异常: ${commentID}`);
           this.emit('download:exception', url, commentID);
           this.pending.delete(url);
           this.failed.add(url);
@@ -285,26 +235,26 @@ export class Downloader extends BaseDownloader {
           return;
         } else if (status === 'Exception' && !commentID) {
           // 文章下载失败(风控导致的)
-          console.warn(`文章(url: ${url} )下载失败(风控所致)`);
+          console.warn(`文章(url: ${url}) 下载失败(风控所致)`);
           await updateDebugCache({
-            fakeid: article.fakeid,
+            fakeid: fakeid || 'UNKNOWN',
             type: `exception:${commentID}`,
             url: url,
-            title: article.title,
+            title: title,
             file: blob,
           });
-          throwException(`文章(url: ${url} )下载失败`);
+          throwException(`文章(url: ${url}) 下载失败`);
         } else if (status === 'Error') {
           // 下载失败
-          console.warn(`文章(url: ${url} )解析失败`);
+          console.warn(`文章(url: ${url}) 解析失败`);
           await updateDebugCache({
-            fakeid: article.fakeid,
+            fakeid: fakeid || 'UNKNOWN',
             type: 'parse error',
             url: url,
-            title: article.title,
+            title: title,
             file: blob,
           });
-          throwException(`文章(url: ${url} )解析失败`);
+          throwException(`文章(url: ${url}) 解析失败`);
         }
       } catch (error) {
         await this.handleDownloadFailure(proxy, url, attempt, error);
@@ -319,10 +269,41 @@ export class Downloader extends BaseDownloader {
   private async downloadMetadataTask(url: string): Promise<void> {
     this.pending.add(url);
 
-    const article = await getArticleByLinkFromServer(url);
-    if (!article) {
+    let article = await getArticleByLinkFromServer(url);
+
+    // 如果没有文章记录（或缺少 fakeid），先尝试提取 fakeid
+    if (!article || !article.fakeid) {
+      console.log(`缺少文章信息或 fakeid，尝试从 HTML 提取: ${url}`);
+      try {
+        const cached = await getArticleHtmlFromServer(url);
+        if (cached) {
+          const cgiData = await parseCgiDataNew(cached.content);
+          if (cgiData && cgiData.bizuin) {
+            if (!article) {
+              article = {
+                fakeid: cgiData.bizuin,
+                appmsgid: cgiData.appmsgid || 0,
+                itemidx: cgiData.itemidx || 1,
+                aid: `${cgiData.appmsgid || 0}_${cgiData.itemidx || 1}`,
+                title: cached.title || '',
+                is_pay_subscribe: 0,
+              } as any;
+              console.log(`✅ 从 HTML 缓存提取到文章信息`);
+            } else {
+              article.fakeid = cgiData.bizuin;
+              console.log(`✅ 从 HTML 缓存提取到 fakeid: ${cgiData.bizuin}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`从 HTML 提取 fakeid 失败:`, error);
+      }
+    }
+
+    if (!article || !article.fakeid) {
       this.pending.delete(url);
       this.failed.add(url);
+      console.warn(`❌ 无法获取文章信息或 fakeid: ${url}`);
       return;
     }
 
