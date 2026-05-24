@@ -11,7 +11,6 @@ interface SearchArticleQuery {
   size?: number;
   keyword: string;
   fakeid?: string;
-  searchType?: 'all' | 'account';
 }
 
 /**
@@ -26,7 +25,6 @@ function decodeHtmlEntities(text: string): string {
     '&#39;': "'",
     '&apos;': "'",
     '&#x27;': "'",
-    '&#x3D;': '=',
     '&#x3D;': '=',
     '&#61;': '=',
   };
@@ -78,6 +76,46 @@ function isValidKeyword(keyword: any): boolean {
 }
 
 /**
+ * 解析微信搜索响应中的文章列表
+ */
+function parseArticlesFromResponse(rawResponse: any, accountName: string): any[] {
+  if (!rawResponse) {
+    console.log('[parseArticlesFromResponse] rawResponse is null');
+    return [];
+  }
+
+  if (rawResponse.base_resp?.ret !== 0) {
+    console.log(`[parseArticlesFromResponse] base_resp.ret=${rawResponse.base_resp?.ret}, err_msg=${rawResponse.base_resp?.err_msg}`);
+    return [];
+  }
+
+  if (!rawResponse.publish_page) {
+    console.log('[parseArticlesFromResponse] no publish_page field, keys:', Object.keys(rawResponse).join(','));
+    return [];
+  }
+
+  try {
+    const publish_page = JSON.parse(rawResponse.publish_page);
+
+    return publish_page.publish_list
+      .filter((item: any) => !!item.publish_info)
+      .flatMap((item: any) => {
+        const publish_info = JSON.parse(item.publish_info);
+        return publish_info.appmsgex;
+      })
+      .map((article: any) => ({
+        ...article,
+        account_nickname: accountName,
+        title: decodeHtmlEntities(article.title),
+        create_time_formatted: formatTimestamp(article.create_time),
+      }));
+  } catch (e) {
+    console.error('解析搜索结果失败:', e);
+    return [];
+  }
+}
+
+/**
  * 在指定公众号中搜索文章
  */
 async function searchArticlesInAccount(
@@ -104,7 +142,7 @@ async function searchArticlesInAccount(
     ajax: 1,
   };
 
-  return proxyMpRequest({
+  const res = await proxyMpRequest({
     event: event,
     method: 'GET',
     endpoint: 'https://mp.weixin.qq.com/cgi-bin/appmsgpublish',
@@ -114,6 +152,14 @@ async function searchArticlesInAccount(
     console.error(`搜索公众号 ${fakeid} 文章失败:`, e);
     return null;
   });
+
+  if (res) {
+    console.log(
+      `[search-article-debug] fakeid=${fakeid} keyword="${keyword}" ret=${res.base_resp?.ret} err_msg=${res.base_resp?.err_msg} has_publish_page=${!!res.publish_page} keys=${Object.keys(res).join(',')}`,
+    );
+  }
+
+  return res;
 }
 
 export default defineEventHandler(async event => {
@@ -122,7 +168,6 @@ export default defineEventHandler(async event => {
     return {
       base_resp: { ret: -1, err_msg: '未登录或登录已过期，请重新扫码登录' },
       articles: [],
-      accounts: [],
       total: 0,
     };
   }
@@ -130,7 +175,6 @@ export default defineEventHandler(async event => {
   const query = getQuery<SearchArticleQuery>(event);
   const keyword = query.keyword;
   const fakeid = query.fakeid;
-  const searchType = query.searchType || 'all';
 
   // 验证搜索关键词
   if (!isValidKeyword(keyword)) {
@@ -140,7 +184,6 @@ export default defineEventHandler(async event => {
         err_msg: '搜索关键词无效，请输入有效的文章标题关键字',
       },
       articles: [],
-      accounts: [],
       total: 0,
     };
   }
@@ -148,44 +191,28 @@ export default defineEventHandler(async event => {
   const begin: number = query.begin || 0;
   const size: number = query.size || 20;
 
-  // 如果指定了 fakeid 或 searchType 为 'account'，直接搜索该公众号下的文章
-  if (fakeid || searchType === 'account') {
-    const targetFakeid = fakeid || '';
-    const res = await searchArticlesInAccount(event, token, targetFakeid, keyword, begin, size);
+  // 指定了 fakeid：在单个公众号中搜索（支持分页）
+  if (fakeid) {
+    const res = await searchArticlesInAccount(event, token, fakeid, keyword, begin, size);
 
     if (!res) {
       return {
-        base_resp: {
-          ret: -1,
-          err_msg: '搜索文章接口失败，请重试',
-        },
+        base_resp: { ret: -1, err_msg: '搜索文章接口失败，请重试' },
         articles: [],
         total: 0,
       };
     }
 
     if (res.base_resp?.ret === 0) {
+      const account = await getAllAccounts().then(accounts => accounts.find(a => a.fakeid === fakeid));
+      const articles = parseArticlesFromResponse(res, account?.nickname || '未知公众号');
       const publish_page = JSON.parse(res.publish_page);
-      const account = await getAllAccounts().then(accounts => accounts.find(a => a.fakeid === targetFakeid));
-
-      const articles = publish_page.publish_list
-        .filter((item: any) => !!item.publish_info)
-        .flatMap((item: any) => {
-          const publish_info = JSON.parse(item.publish_info);
-          return publish_info.appmsgex;
-        })
-        .map((article: any) => ({
-          ...article,
-          account_nickname: account?.nickname || '未知公众号',
-          title: decodeHtmlEntities(article.title),
-          create_time_formatted: formatTimestamp(article.create_time),
-        }));
 
       return {
         base_resp: { ret: 0 },
         articles: articles,
-        accounts: [],
-        total: publish_page.total_count,
+        total: publish_page.total_count || articles.length,
+        hasMore: begin + articles.length < publish_page.total_count,
       };
     }
 
@@ -196,55 +223,37 @@ export default defineEventHandler(async event => {
     };
   }
 
-  // 获取用户已关注的公众号列表
+  // 未指定 fakeid：在所有已关注公众号中并发搜索
   const myAccounts = await getAllAccounts();
 
   if (!myAccounts || myAccounts.length === 0) {
     return {
-      base_resp: {
-        ret: -1,
-        err_msg: '请先添加公众号后再搜索文章',
-      },
+      base_resp: { ret: -1, err_msg: '请先添加公众号后再搜索文章' },
       articles: [],
-      accounts: [],
       total: 0,
     };
   }
 
-  // 在所有关注的公众号中并发搜索文章
-  // 创建 fakeid -> account 的映射
-  const accountMap = new Map(myAccounts.map(acc => [acc.fakeid, acc]));
-
   const searchPromises = myAccounts.map(account =>
-    searchArticlesInAccount(event, token, account.fakeid, keyword, 0, 10)
+    searchArticlesInAccount(event, token, account.fakeid, keyword, 0, size)
   );
 
   const results = await Promise.all(searchPromises);
 
   // 合并所有搜索结果
   let allArticles: any[] = [];
-  let totalCount = 0;
 
   results.forEach((res, index) => {
-    if (res && res.base_resp?.ret === 0) {
-      const publish_page = JSON.parse(res.publish_page);
-      const account = myAccounts[index];
-
-      const articles = publish_page.publish_list
-        .filter((item: any) => !!item.publish_info)
-        .flatMap((item: any) => {
-          const publish_info = JSON.parse(item.publish_info);
-          return publish_info.appmsgex;
-        })
-        .map((article: any) => ({
-          ...article,
-          account_nickname: account?.nickname || '未知公众号',
-          title: decodeHtmlEntities(article.title),
-          create_time_formatted: formatTimestamp(article.create_time),
-        }));
-
+    const account = myAccounts[index];
+    if (res) {
+      console.log(
+        `[search-article] account="${account?.nickname}" fakeid=${account?.fakeid} ret=${res.base_resp?.ret} has_publish_page=${!!res.publish_page}`,
+      );
+      const articles = parseArticlesFromResponse(res, account?.nickname || '未知公众号');
+      console.log(`[search-article] account="${account?.nickname}" parsed ${articles.length} articles`);
       allArticles = allArticles.concat(articles);
-      totalCount += publish_page.total_count || 0;
+    } else {
+      console.log(`[search-article] account="${account?.nickname}" fakeid=${account?.fakeid} response=null`);
     }
   });
 
@@ -255,16 +264,14 @@ export default defineEventHandler(async event => {
     return timeB - timeA;
   });
 
-  // 分页处理
-  const startIndex = begin * size;
-  const endIndex = startIndex + size;
-  const paginatedArticles = allArticles.slice(startIndex, endIndex);
+  console.log(
+    `[search-article] keyword="${keyword}" accounts=${myAccounts.length} totalResults=${allArticles.length}`,
+  );
 
   return {
     base_resp: { ret: 0 },
-    articles: paginatedArticles,
-    accounts: [],
+    articles: allArticles,
     total: allArticles.length,
-    hasMore: endIndex < allArticles.length,
+    hasMore: false,
   };
 });

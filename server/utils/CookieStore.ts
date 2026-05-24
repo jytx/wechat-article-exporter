@@ -45,8 +45,36 @@ export class AccountCookie {
 
   // 根据 cookie 中的 expires 来确定是否已过期
   public get isExpired(): boolean {
-    // todo
+    const now = Date.now();
+    // 检查所有 cookie 的 expires_timestamp，只要有一个已过期就认为会话过期
+    for (const cookie of this._cookie) {
+      if (cookie.expires_timestamp && typeof cookie.expires_timestamp === 'number' && cookie.expires_timestamp < now) {
+        return true;
+      }
+    }
     return false;
+  }
+
+  /**
+   * 合并新的 set-cookie 到现有 cookie 中
+   * 新 cookie 会覆盖同名的旧 cookie
+   */
+  public update(newCookies: string[]): void {
+    const parsed = AccountCookie.parse(newCookies);
+    const cookieMap = new Map<string, CookieEntity>();
+    // 先放旧的
+    for (const cookie of this._cookie) {
+      if (cookie.name) {
+        cookieMap.set(cookie.name as string, cookie);
+      }
+    }
+    // 用新的覆盖
+    for (const cookie of parsed) {
+      if (cookie.name) {
+        cookieMap.set(cookie.name as string, cookie);
+      }
+    }
+    this._cookie = Array.from(cookieMap.values());
   }
 
   public static parse(cookies: string[]): CookieEntity[] {
@@ -164,6 +192,28 @@ class CookieStore {
     this.store.delete(authKey);
     this.evictIfNeeded();
     this.store.set(authKey, accountCookie);
+    return await setMpCookie(authKey, accountCookie.toJSON());
+  }
+
+  /**
+   * 更新用户的 cookie（合并微信响应中的新 set-cookie）
+   * @param authKey
+   * @param newCookies 微信响应中的 set-cookie 字符串数组
+   */
+  async updateCookie(authKey: string, newCookies: string[]): Promise<boolean> {
+    if (!newCookies || newCookies.length === 0) {
+      return true; // 无新 cookie，无需更新
+    }
+
+    const accountCookie = await this.getAccountCookie(authKey);
+    if (!accountCookie) {
+      return false; // 找不到已有的 cookie 记录
+    }
+
+    // 合并新 cookie
+    accountCookie.update(newCookies);
+
+    // 持久化到 KV 数据库
     return await setMpCookie(authKey, accountCookie.toJSON());
   }
 

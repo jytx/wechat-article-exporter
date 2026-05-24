@@ -417,7 +417,10 @@ async function selectArticleFromSearch(article: any) {
     await upsertArticleStub(row);
     refreshGrid();
 
-    toast.success('添加成功', `"${article.title}" 已添加到列表`);
+    toast.success('添加成功', `"${article.title}" 已添加，正在抓取...`);
+
+    // 自动抓取文章内容
+    downloadRows([row], { silent: true });
   } catch (error: any) {
     console.error('从搜索添加文章失败:', error);
     toast.error('添加失败', error?.message || '添加失败');

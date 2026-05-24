@@ -1,7 +1,9 @@
 <template>
   <USlideover v-model="isOpen" side="left" :ui="{ overlay: { background: 'bg-zinc-400/75' } }">
     <div
+      ref="scrollContainerRef"
       class="w-96 rounded-lg divide-y divide-gray-100 dark:divide-gray-800 shadow bg-white dark:bg-gray-900 flex flex-col flex-1 overflow-y-scroll"
+      @scroll="onScroll"
     >
       <div class="sticky top-0 bg-white py-4 px-2 shadow dark:bg-gray-900 z-10">
         <SearchArticleForm ref="searchFormRef" v-model="articleQuery" @search="searchArticle" />
@@ -35,17 +37,9 @@
         <p v-else-if="!loading && articleList.length === 0 && hasSearched" class="text-center mt-2 py-2 text-slate-400">
           未找到相关文章，请尝试其他关键词
         </p>
-        <p v-else-if="noMoreData" class="text-center mt-2 py-2 text-slate-400">
+        <p v-else-if="noMoreData && articleList.length > 0" class="text-center mt-2 py-2 text-slate-400">
           已全部加载完毕
         </p>
-        <button
-          v-else-if="articleList.length > 0 && !loading && !noMoreData"
-          @click="loadData"
-          class="block mx-auto my-2 h-10 px-6 font-semibold rounded-md border border-slate-200 text-slate-900 dark:text-slate-300 hover:border-slate-400"
-          type="button"
-        >
-          加载更多
-        </button>
       </div>
     </div>
   </USlideover>
@@ -59,6 +53,7 @@ const toast = useToast();
 
 const isOpen = ref(false);
 const searchFormRef = ref<InstanceType<typeof SearchArticleForm> | null>(null);
+const scrollContainerRef = ref<HTMLElement | null>(null);
 
 const articleQuery = ref('');
 const articleList = ref<any[]>([]);
@@ -67,8 +62,17 @@ const noMoreData = ref(false);
 const hasSearched = ref(false);
 const totalArticles = ref(0);
 
-let currentPage = 0;
-const pageSize = 20;
+/**
+ * 滚动到底部时自动加载更多
+ */
+function onScroll() {
+  const el = scrollContainerRef.value;
+  if (!el || loading.value || noMoreData.value || articleList.value.length === 0) return;
+  // 距离底部小于 100px 时触发加载
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+    loadData();
+  }
+}
 
 /**
  * 搜索文章
@@ -77,7 +81,6 @@ async function searchArticle() {
   const keyword = articleQuery.value.trim();
   if (!keyword) return;
 
-  currentPage = 0;
   articleList.value = [];
   noMoreData.value = false;
   hasSearched.value = true;
@@ -86,15 +89,9 @@ async function searchArticle() {
   try {
     const response = await fetch('/api/web/mp/search-all-articles', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        keyword: keyword,
-        begin: 0,
-        count: pageSize * 2, // 首次加载更多
-      }),
+      body: JSON.stringify({ keyword, begin: 0, count: 20 }),
     });
 
     if (!response.ok) {
@@ -104,10 +101,11 @@ async function searchArticle() {
     const result = await response.json();
 
     if (result.base_resp?.ret === 0) {
-      articleList.value = result.articles || [];
-      totalArticles.value = result.total || 0;
-      currentPage = 0;
-      noMoreData.value = !result.hasMore || articleList.value.length >= result.total;
+      const articles = result.articles || [];
+      articleList.value = articles;
+      totalArticles.value = articles.length;
+      // 全公众号搜索一次返回全部结果，hasMore 由后端决定
+      noMoreData.value = !result.hasMore;
     } else {
       throw new Error(result.base_resp?.err_msg || '搜索失败');
     }
@@ -125,23 +123,20 @@ async function searchArticle() {
 }
 
 /**
- * 加载更多文章数据
+ * 加载更多文章数据（仅指定 fakeid 时有效）
  */
 async function loadData() {
   loading.value = true;
-  currentPage += 1;
 
   try {
     const response = await fetch('/api/web/mp/search-all-articles', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         keyword: articleQuery.value,
-        begin: currentPage * pageSize,
-        count: pageSize,
+        begin: articleList.value.length,
+        count: 20,
       }),
     });
 
@@ -153,8 +148,12 @@ async function loadData() {
 
     if (result.base_resp?.ret === 0) {
       const newArticles = result.articles || [];
-      articleList.value.push(...newArticles);
-      noMoreData.value = !result.hasMore || articleList.value.length >= result.total;
+      // 去重
+      const existingIds = new Set(articleList.value.map(a => a.aid || a.link));
+      const uniqueNew = newArticles.filter((a: any) => !existingIds.has(a.aid || a.link));
+      articleList.value.push(...uniqueNew);
+      totalArticles.value = articleList.value.length;
+      noMoreData.value = !result.hasMore;
     } else {
       throw new Error(result.base_resp?.err_msg || '搜索失败');
     }
@@ -192,7 +191,6 @@ function open() {
   totalArticles.value = 0;
   noMoreData.value = false;
   hasSearched.value = false;
-  currentPage = 0;
 }
 
 defineExpose({

@@ -118,10 +118,9 @@ export async function proxyMpRequest(options: RequestOptions) {
     }
   }
 
-  // 这里是否需要执行？
-  // 更新 CookieStore 中的 cookie
+  // 更新 CookieStore 中的 cookie（微信会在每次响应中刷新 session cookie）
   else {
-    // updateCookies(options.event, mpResponse.headers.getSetCookie());
+    updateCookies(options.event, mpResponse.headers.getSetCookie());
   }
 
   // 构造返回给客户端的响应
@@ -154,9 +153,10 @@ export function getAuthKeyFromRequest(event: H3Event): string {
   return authKey;
 }
 
-// function updateCookies(event: H3Event, cookies: string[]): void {
-//   const authKey = getAuthKeyFromRequest(event);
-//   if (authKey) {
-//     cookieStore.updateCookie(authKey, cookies);
-//   }
-// }
+function updateCookies(event: H3Event, cookies: string[]): void {
+  if (!cookies || cookies.length === 0) return;
+  const authKey = getAuthKeyFromRequest(event);
+  if (authKey) {
+    cookieStore.updateCookie(authKey, cookies);
+  }
+}

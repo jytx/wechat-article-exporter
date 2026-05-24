@@ -85,13 +85,10 @@ export default defineEventHandler(async event => {
     requestData.append('sub', 'check_appmsg_copyright_stat');
     requestData.append('fingerprint', `b0f86a226dcc3c02c01a54bc1ac4fef6`);
     requestData.append('random', String(random));
-    requestData.append('url', 'hermes');
+    requestData.append('url', keyword);
     requestData.append('allow_reprint', '0');
     requestData.append('begin', String(begin));
     requestData.append('count', String(count));
-
-    // 添加搜索关键词
-    requestData.append('query', keyword);
 
     // 获取 cookie
     const cookie = await getCookieFromStore(event);
@@ -158,11 +155,18 @@ export default defineEventHandler(async event => {
         });
       }
 
+      const totalReturned = response.total || articles.length;
+      const hasMore = articles.length >= count;
+
+      console.log(
+        `[search-all-articles] keyword="${keyword}" begin=${begin} count=${count} returned=${articles.length} total=${totalReturned} hasMore=${hasMore}`,
+      );
+
       return {
         base_resp: { ret: 0 },
         articles: articles,
-        total: response.total || articles.length,
-        hasMore: response.list && response.list.length >= count,
+        total: totalReturned,
+        hasMore: hasMore,
       };
     } else {
       return {
