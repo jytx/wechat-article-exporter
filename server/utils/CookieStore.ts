@@ -58,6 +58,9 @@ export class AccountCookie {
   /**
    * 合并新的 set-cookie 到现有 cookie 中
    * 新 cookie 会覆盖同名的旧 cookie
+   *
+   * 注意：微信在 session 过期时会返回 value 为 "EXPIRED" 的 cookie（如 slave_sid=EXPIRED），
+   * 这类 cookie 不会被写入，以保留上一次有效的 session cookie，避免覆盖导致彻底失效。
    */
   public update(newCookies: string[]): void {
     const parsed = AccountCookie.parse(newCookies);
@@ -68,9 +71,14 @@ export class AccountCookie {
         cookieMap.set(cookie.name as string, cookie);
       }
     }
-    // 用新的覆盖
+    // 用新的覆盖（跳过 EXPIRED 和空值，避免微信返回的过期标记覆盖有效 session）
     for (const cookie of parsed) {
       if (cookie.name) {
+        const value = (cookie.value as string) || '';
+        if (value.toUpperCase() === 'EXPIRED' || value === '') {
+          // 微信返回的 EXPIRED 标记，跳过，保留原有的有效 cookie
+          continue;
+        }
         cookieMap.set(cookie.name as string, cookie);
       }
     }

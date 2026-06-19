@@ -149,6 +149,9 @@ import type { ParsedCredential } from '~/types/credential';
 
 export type CredentialState = 'active' | 'inactive' | 'warning';
 
+// 支持通过 localStorage 覆盖默认的 CREDENTIAL_API_HOST（端口冲突时可自定义）
+const credentialApiHost = localStorage.getItem('credential-api-host') || CREDENTIAL_API_HOST;
+
 const emit = defineEmits<{
   (e: 'update:pendingCount', value: number): void;
 }>();
@@ -333,7 +336,7 @@ const authorized = ref(false);
 async function authorize() {
   try {
     authorizeBtnLoading.value = true;
-    const response = await fetch(`${CREDENTIAL_API_HOST}/authorize`, {
+    const response = await fetch(`${credentialApiHost}/authorize`, {
       method: 'GET',
       headers: {
         Authorization: apiKey.value,
@@ -364,7 +367,7 @@ async function authorize() {
 async function fetchCredentials() {
   let result: Credential[] = [];
   try {
-    const response = await fetch(`${CREDENTIAL_API_HOST}/credentials`, {
+    const response = await fetch(`${credentialApiHost}/credentials`, {
       method: 'GET',
       headers: {
         Authorization: apiKey.value,

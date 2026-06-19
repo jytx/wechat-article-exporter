@@ -12,7 +12,6 @@
 	import { AgGridVue } from 'ag-grid-vue3';
 	import { defu } from 'defu';
 	import { formatTimeStamp } from '#shared/utils/helpers';
-	import { getArticleList } from '~/apis'; // 保留：调用微信 API
 	import GlobalSearchAccountDialog from '~/components/global/SearchAccountDialog.vue';
 	import GridAccountActions from '~/components/grid/AccountActions.vue';
 	import GridLoadProgress from '~/components/grid/LoadProgress.vue';
@@ -34,11 +33,6 @@
 	  title: `公众号管理 | ${websiteName}`,
 	});
 
-	interface PromiseInstance {
-	  resolve: (value: unknown) => void;
-	  reject: (reason?: any) => void;
-	}
-
 	const toast = toastFactory();
 	const modal = useModal();
 	const { checkLogin } = useLoginCheck();
@@ -46,7 +40,7 @@
 	// 新增：使用公众号 API
 	const accountApi = useAccountApiWithState();
 
-	const { getSyncTimestamp, getSyncRangeLabel, isSyncAll } = useSyncDeadline();
+	const { getSyncTimestamp } = useSyncDeadline();
 	const syncToTimestamp = getSyncTimestamp();
 
 	const preferences = usePreferences();
@@ -101,7 +95,11 @@
 	// 当前正在同步的公众号id
 	const syncingRowId = ref<string | null>(null);
 
-	const syncTimer = ref<number | null>(null);
+	// 正在运行的后台任务（fakeid -> taskId）
+	const activeSyncTasks = ref<Map<string, string>>(new Map());
+
+	// 轮询定时器
+	const pollTimer = ref<number | null>(null);
 
 	// 防止重复加载的标志
 	const isLoading = ref(false);
@@ -109,166 +107,152 @@
 	// 标记是否已经初始化完成（用于首次加载时显示加载状态）
 	const isInitialized = ref(false);
 
-	async function _load(account: Account, begin: number, loadMore: boolean, promise: PromiseInstance) {
-	  if (isCanceled.value) {
-	    isCanceled.value = false; // 这里需要将状态复位
-	    promise.reject(new Error('已取消同步'));
+	/**
+	 * 启动后台同步任务并轮询进度
+	 * 同步在服务端进行，切页面不中断。
+	 */
+	async function startBackgroundSync(
+	  account: Account,
+	  options: { begin?: number; deadline?: number } = {},
+	): Promise<void> {
+	  if (activeSyncTasks.value.has(account.fakeid)) {
+	    toast.info('提示', `${account.nickname} 正在同步中`);
 	    return;
 	  }
 
-	  syncingRowId.value = account.fakeid;
-	  isSyncing.value = true;
+	  const intervalSeconds = (preferences.value as unknown as Preferences).accountSyncSeconds || 5;
 
-	  // 保留：调用微信 API 获取文章列表
-	  const [articles, completed, totalCount] = await getArticleList(account, begin);
-
-	  // 如果是第一批（begin=0）且有总数，更新公众号的 total_count
-	  if (begin === 0 && totalCount > 0) {
-	    try {
-	      await $fetch('/api/web/data/v1/accounts/' + account.fakeid, {
-	        method: 'PATCH',
-	        body: { total_count: totalCount }
-	      });
-	    } catch (error) {
-	      console.error('更新公众号总数失败:', error);
-	    }
-	  }
-	  if (isCanceled.value) {
-	    isCanceled.value = false;
-	    promise.reject(new Error('已取消同步'));
-	    return;
-	  }
-	  if (completed) {
-	    // 同步完成时，更新 total_count 为实际同步的数量
-	    try {
-	      const response = await $fetch<Account>(`/api/web/data/v1/accounts/${account.fakeid}`);
-	      if (response && response.data && response.data.synced_count > 0) {
-	        await $fetch('/api/web/data/v1/accounts/' + account.fakeid, {
-	          method: 'PATCH',
-	          body: { total_count: response.data.synced_count }
-	        });
-	        console.log(`[sync completed] 更新 total_count: ${response.data.synced_count}`);
-	      }
-	    } catch (error) {
-	      console.error('更新 total_count 失败:', error);
-	    }
-
-	    await updateRow(account.fakeid);
-	    syncingRowId.value = null;
-	    isSyncing.value = false;
-	    promise.resolve(account);
-	    return;
-	  }
-
-	  const count = articles.filter(article => article.itemidx === 1).length; // 消息数
-	  begin += count;
-
-	  // 使用 API 批量保存文章到 SQLite
 	  try {
-	    // 转换文章格式
-	    const articlesData = articles
-	      .filter(article => article.itemidx === 1)
-	      .map(article => ({
-	        key: `${account.fakeid}:${article.aid}`,
-	        fakeid: account.fakeid,
-	        aid: article.aid,
-	        title: article.title,
-	        link: article.link,
-	        cover: article.cover,
-	        author: article.author,
-	        create_time: article.create_time,
-	        update_time: article.update_time,
-	        datetime: article.datetime,
-	        digest: article.digest,
-	        album_id: article.album_id || null,
-	        appmsg_album_infos: article.appmsg_album_infos || [],
-	        downloaded: 0,
-	        is_deleted: 0
-	      }));
-
-	    // 通过 API 保存文章
-	    await $fetch('/api/web/data/v1/batch/save-articles', {
-	      method: 'POST',
-	      body: {
-	        articles: articlesData
-	      }
+	    const result = await accountApi.syncAccount(account.fakeid, {
+	      ...options,
+	      intervalSeconds,
 	    });
-	  } catch (error) {
-	    console.error('保存文章失败:', error);
-	  }
 
-	  // 更新行数据
-	  await updateRow(account.fakeid);
-
-	  if (articles.at(-1)!.create_time < syncToTimestamp) {
-	    // 已同步到配置的时间范围
-	    loadMore = false;
-	  }
-
-	  if (loadMore) {
-	    syncTimer.value = window.setTimeout(
-	      () => {
-	        if (isCanceled.value) {
-	          console.warn('已取消同步');
-	          isCanceled.value = false;
-	          promise.reject(new Error('已取消同步'));
-	          return;
-	        }
-	        _load(account, begin, true, promise);
-	      },
-	      ((preferences.value as unknown as Preferences).accountSyncSeconds || 5) * 1000
-	    );
-	  } else {
-	    syncingRowId.value = null;
-	    isSyncing.value = false;
-	    promise.resolve(account);
-	  }
-	}
-
-	// 同步指定公众号
-	async function loadAccountArticle(account: Account, loadMore = true) {
-	  return new Promise(async (resolve, reject) => {
-	    const promise: PromiseInstance = { resolve, reject };
-
-	    // 获取当前已同步的文章数，从该位置继续同步
-	    let begin = 0;
-	    try {
-	      const response = await $fetch<Account>(`/api/web/data/v1/accounts/${account.fakeid}`);
-	      if (response && response.data) {
-	        begin = response.data.synced_count || 0;
-	        console.log(`[loadAccountArticle] 从已同步位置继续: ${begin}`);
-	      }
-	    } catch (error) {
-	      console.warn('获取已同步文章数失败，从头开始同步:', error);
-	    }
-
-	    _load(account, begin, loadMore, promise).catch(e => {
-	      syncingRowId.value = null;
-	      isSyncing.value = false;
-
-	      if (e.message === 'session expired') {
+	    if (result.error) {
+	      if (result.error === 'session expired' || result.error === '未登录或登录已过期') {
 	        modal.open(LoginModal);
 	      }
-	      reject(e);
-	    });
-	  });
+	      toast.error('同步失败', result.error);
+	      return;
+	    }
+
+	    if (result.alreadyRunning) {
+	      toast.info('提示', `${account.nickname} 正在同步中`);
+	      return;
+	    }
+
+	    // 记录任务，开始轮询
+	    activeSyncTasks.value.set(account.fakeid, result.taskId);
+	    syncingRowId.value = account.fakeid;
+	    isSyncing.value = true;
+
+	    startPolling();
+	  } catch (e: any) {
+	    console.error('启动同步失败:', e);
+	    toast.error('同步失败', e?.message || '启动同步失败');
+	  }
 	}
 
-	// 同步所有公众号
+	/**
+	 * 轮询所有活跃任务的进度
+	 */
+	function startPolling() {
+	  if (pollTimer.value) return; // 已有轮询在跑
+
+	  pollTimer.value = window.setInterval(async () => {
+	    if (activeSyncTasks.value.size === 0) {
+	      stopPolling();
+	      return;
+	    }
+
+	    // 查询所有活跃任务状态
+	    const taskIds = Array.from(activeSyncTasks.value.values());
+	    for (const taskId of taskIds) {
+	      try {
+	        const task = await accountApi.getSyncStatus(taskId);
+	        const fakeid = task.fakeid;
+
+	        if (task.status === 'completed' || task.status === 'failed') {
+	          activeSyncTasks.value.delete(fakeid);
+	          await updateRow(fakeid);
+
+	          if (task.status === 'failed') {
+	            if (task.error === 'session expired') {
+	              modal.open(LoginModal);
+	            }
+	            toast.error('同步失败', `${task.nickname}: ${task.message}`);
+	          } else {
+	            toast.success('同步完成', task.message);
+	          }
+	        }
+	      } catch (e) {
+	        console.warn('查询同步状态失败:', e);
+	      }
+	    }
+
+	    // 所有任务完成
+	    if (activeSyncTasks.value.size === 0) {
+	      stopPolling();
+	      syncingRowId.value = null;
+	      isSyncing.value = false;
+	      // 刷新所有行
+	      await refresh();
+	    }
+	  }, 2000);
+	}
+
+	function stopPolling() {
+	  if (pollTimer.value) {
+	    window.clearInterval(pollTimer.value);
+	    pollTimer.value = null;
+	  }
+	}
+
+	/**
+	 * 取消同步（前端停止轮询，服务端任务继续跑完当前页后自然结束）
+	 */
+	function cancelSync() {
+	  stopPolling();
+	  activeSyncTasks.value.clear();
+	  syncingRowId.value = null;
+	  isSyncing.value = false;
+	  isCanceled.value = false;
+	}
+
+	// 同步单个公众号（从已同步位置继续）
+	async function loadAccountArticle(account: Account) {
+	  if (!checkLogin()) return;
+	  await startBackgroundSync(account, {});
+	}
+
+	// 同步所有选中的公众号（后台任务模式，切页面不中断）
 	async function loadSelectedAccountArticle() {
 	  if (!checkLogin()) return;
-
 	  isCanceled.value = false;
 
-	  try {
-	    const rows = getSelectedRows();
-	    for (const account of rows) {
-	      await loadAccountArticle(account);
-	    }
-	    const rangeHint = isSyncAll() ? '' : `（同步范围：${getSyncRangeLabel()}）`;
-	    toast.success('同步完成', `已成功同步 ${rows.length} 个公众号${rangeHint}`);
-	  } catch (e: any) {
-	    toast.error('同步失败', e.message);
+	  const deadline = syncToTimestamp;
+	  const rows = getSelectedRows();
+
+	  for (const account of rows) {
+	    await startBackgroundSync(account, {
+	      deadline: deadline > 0 ? deadline : undefined,
+	    });
+	  }
+	}
+
+	// 重新同步（强制从头开始）
+	async function resyncSelectedAccounts() {
+	  if (!checkLogin()) return;
+	  isCanceled.value = false;
+
+	  const deadline = syncToTimestamp;
+	  const rows = getSelectedRows();
+
+	  for (const account of rows) {
+	    await startBackgroundSync(account, {
+	      begin: 0,
+	      deadline: deadline > 0 ? deadline : undefined,
+	    });
 	  }
 	}
 
@@ -409,27 +393,12 @@
 	    cellRenderer: GridAccountActions,
 	    cellRendererParams: {
 	      onSync: (params: ICellRendererParams) => {
-	        if (!checkLogin()) return;
-
-	        isCanceled.value = false;
-	        loadAccountArticle(params.data)
-	          .then(() => {
-	            const rangeHint = isSyncAll() ? '' : `（同步范围：${getSyncRangeLabel()}）`;
-	            toast.success('同步完成', `公众号【${params.data.nickname}】的文章已同步完毕${rangeHint}`);
-	          })
-	          .catch(e => {
-	            toast.error('同步失败', e.message);
-	          });
+	        // 后台任务模式：触发后立即返回，进度通过轮询获取，切页面不中断
+	        loadAccountArticle(params.data);
 	      },
 	      onStop: (params: ICellRendererParams) => {
-	        isCanceled.value = true;
-	        if (syncTimer.value) {
-	          window.clearTimeout(syncTimer.value);
-	          syncTimer.value = null;
-	        }
-
-	        syncingRowId.value = null;
-	        isSyncing.value = false;
+	        // 前端停止轮询（服务端任务跑完当前页后自然结束）
+	        cancelSync();
 	      },
 	      isDeleting: isDeleting,
 	      isSyncing: isSyncing,
@@ -455,6 +424,33 @@
 
 	  restoreColumnState();
 	  refresh();
+	  // 恢复可能有正在运行的后台同步任务（切页面后回来）
+	  restoreActiveSyncTasks();
+	}
+
+	/**
+	 * 页面加载时检查是否有正在运行的后台同步任务，有则恢复轮询
+	 * 解决"切页面后回来，同步状态丢失"的问题
+	 */
+	async function restoreActiveSyncTasks() {
+	  try {
+	    const result = await accountApi.getSyncStatus();
+	    const tasks = result.tasks || [];
+	    const running = tasks.filter((t: any) => t.status === 'running' || t.status === 'pending');
+
+	    if (running.length > 0) {
+	      // 恢复任务映射
+	      for (const t of running) {
+	        activeSyncTasks.value.set(t.fakeid, t.id);
+	      }
+	      isSyncing.value = true;
+	      syncingRowId.value = running[0].fakeid;
+	      console.log(`[restore] 恢复了 ${running.length} 个正在运行的同步任务`);
+	      startPolling();
+	    }
+	  } catch (e) {
+	    // 静默失败
+	  }
 	}
 
 	function onColumnStateChange() {
@@ -663,15 +659,25 @@
 	          @click="deleteSelectedAccounts"
 	        >删除</UButton
 	        >
-	        <UButton
-	          color="black"
-	          icon="i-heroicons:arrow-path-rounded-square-20-solid"
-	          class="disabled:opacity-35"
-	          :loading="isSyncing"
-	          :disabled="isDeleting || !hasSelectedRows"
-	          @click="loadSelectedAccountArticle"
-	          >同步</UButton
-	        >
+                <UButton
+                  color="black"
+                  icon="i-heroicons:arrow-path-rounded-square-20-solid"
+                  class="disabled:opacity-35"
+                  :loading="isSyncing"
+                  :disabled="isDeleting || !hasSelectedRows"
+                  @click="loadSelectedAccountArticle"
+                  >同步</UButton
+                >
+                <UButton
+                  color="primary"
+                  variant="outline"
+                  icon="i-heroicons:arrow-path"
+                  class="disabled:opacity-35"
+                  :loading="isSyncing"
+                  :disabled="isDeleting || !hasSelectedRows"
+                  @click="resyncSelectedAccounts"
+                  >重新同步</UButton
+                >
 	        <div class="hidden xl:flex flex-1 justify-end">
 	          <span class="self-end text-sm text-blue-500 font-medium">同步范围: {{ getActualDateRange() }}</span>
 	        </div>

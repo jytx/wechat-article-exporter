@@ -116,6 +116,28 @@ function initializeSchema(database: Database.Database) {
 
   // 创建设置表
   initializeSettingsTable();
+
+  // 创建文章指标表（阅读量/点赞/分享等，用于热文榜）
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS article_metrics (
+      url TEXT PRIMARY KEY,
+      fakeid TEXT NOT NULL,
+      title TEXT NOT NULL,
+      read_num INTEGER DEFAULT 0,
+      old_like_num INTEGER DEFAULT 0,
+      share_num INTEGER DEFAULT 0,
+      like_num INTEGER DEFAULT 0,
+      comment_num INTEGER DEFAULT 0,
+      article_create_time INTEGER,
+      sampled_at INTEGER,
+      created_at INTEGER DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_metrics_read_num ON article_metrics(read_num DESC);
+    CREATE INDEX IF NOT EXISTS idx_metrics_fakeid ON article_metrics(fakeid);
+    CREATE INDEX IF NOT EXISTS idx_metrics_article_time ON article_metrics(article_create_time);
+  `);
 }
 
 /**

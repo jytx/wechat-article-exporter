@@ -142,7 +142,7 @@ export function useAccountApi() {
   }
 
   /**
-   * 批量同步文章
+   * 批量同步文章（单页）
    */
   async function syncArticles(
     fakeid: string,
@@ -157,6 +157,36 @@ export function useAccountApi() {
     return await api.post('/batch/sync-articles', { fakeid, begin, size });
   }
 
+  /**
+   * 服务端完整同步公众号文章（后台任务，立即返回 taskId）
+   * 同步在服务端进行，切页面不中断。
+   */
+  async function syncAccount(
+    fakeid: string,
+    options: {
+      begin?: number;
+      maxPages?: number;
+      intervalSeconds?: number;
+      deadline?: number;
+    } = {},
+  ): Promise<{
+    taskId: string;
+    fakeid: string;
+    nickname: string;
+    alreadyRunning?: boolean;
+    error?: string;
+  }> {
+    return await api.post('/batch/sync-account', { fakeid, ...options });
+  }
+
+  /**
+   * 查询同步任务进度
+   */
+  async function getSyncStatus(taskId?: string): Promise<any> {
+    const query = taskId ? { taskId } : {};
+    return await api.get('/batch/sync-status', query);
+  }
+
   return {
     getAccounts,
     getAccount,
@@ -167,6 +197,8 @@ export function useAccountApi() {
     deleteAccounts,
     exportAccounts,
     syncArticles,
+    syncAccount,
+    getSyncStatus,
   };
 }
 
@@ -268,5 +300,7 @@ export function useAccountApiWithState() {
     deleteAccounts: accountApi.deleteAccounts,
     exportAccounts: accountApi.exportAccounts,
     syncArticles: accountApi.syncArticles,
+    syncAccount: accountApi.syncAccount,
+    getSyncStatus: accountApi.getSyncStatus,
   };
 }
