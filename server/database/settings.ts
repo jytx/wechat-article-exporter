@@ -40,6 +40,15 @@ const DEFAULT_SETTINGS: SettingItem[] = [
       metadataOverrideContent: false,
     }),
   },
+  // —— 文章自动同步调度 ——
+  {
+    key: 'article_sync_schedule',
+    value: JSON.stringify({
+      enabled: false,
+      cron: '0 3 * * *', // 默认每天凌晨3点
+    }),
+  },
+
 ];
 
 /**

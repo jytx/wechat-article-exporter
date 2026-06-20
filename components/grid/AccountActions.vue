@@ -9,6 +9,7 @@ interface Props {
     isDeleting: boolean;
     isSyncing: boolean;
     syncingRowId: string | null;
+    syncingFakeids?: Set<string>;
   };
 }
 const props = defineProps<Props>();
@@ -20,7 +21,14 @@ function stop() {
   props.params.onStop && props.params.onStop(props.params);
 }
 const isDisabled = computed(() => props.params.isDeleting || props.params.isSyncing);
-const isLoading = computed(() => props.params.isSyncing && props.params.node.id === props.params.syncingRowId);
+const isLoading = computed(() => {
+  // 兼容两种模式：单个 syncingRowId 或多个 syncingFakeids
+  const fid = props.params.node.id || '';
+  if (props.params.syncingFakeids) {
+    return props.params.syncingFakeids.has(fid);
+  }
+  return props.params.isSyncing && fid === props.params.syncingRowId;
+});
 </script>
 
 <template>

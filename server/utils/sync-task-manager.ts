@@ -68,9 +68,45 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ========== 串行任务队列 ==========
+// 同一时间只允许一个同步任务在跑，避免并发请求触发微信限流/杀 session
+let isRunningTask = false;
+const taskQueue: Array<() => Promise<void>> = [];
+
+/**
+ * 将任务加入队列，串行执行
+ */
+async function enqueueTask(taskFn: () => Promise<void>): Promise<void> {
+  return new Promise(resolve => {
+    taskQueue.push(async () => {
+      await taskFn();
+      resolve();
+    });
+    processQueue();
+  });
+}
+
+async function processQueue() {
+  if (isRunningTask) return; // 已有任务在跑，等待
+  const next = taskQueue.shift();
+  if (!next) return;
+
+  isRunningTask = true;
+  try {
+    await next();
+  } finally {
+    isRunningTask = false;
+    // 队列里还有任务，继续执行下一个（加一点间隔）
+    if (taskQueue.length > 0) {
+      setTimeout(() => processQueue(), 1000);
+    }
+  }
+}
+
 /**
  * 启动一个后台同步任务
- * 返回 taskId，调用方立即返回给前端
+ * 返回 taskId，调用方立即返回给前端。
+ * 多个任务会自动排队串行执行（避免并发触发微信限流）。
  */
 export function startSyncTask(params: {
   fakeid: string;
@@ -89,27 +125,36 @@ export function startSyncTask(params: {
   const maxPages = Math.min(1000, params.maxPages || 500);
   const intervalSeconds = params.intervalSeconds || 5;
   const deadline = params.deadline || 0;
-  let begin = params.begin || 0;
+  const begin = params.begin || 0;
 
   const task: SyncTask = {
     id: taskId,
     fakeid,
     nickname,
-    status: 'running',
+    status: 'pending',
     synced: 0,
     totalWx: 0,
     dbCount: 0,
     pagesDone: 0,
     maxPages,
-    message: '开始同步...',
+    message: '排队中...',
     startedAt: Date.now(),
     updatedAt: Date.now(),
   };
 
   tasks.set(taskId, task);
 
-  // fire-and-forget：后台 Promise 跑循环，不阻塞 HTTP 响应
-  void runSyncLoop(taskId, { fakeid, authKey, begin, pageSize, maxPages, intervalSeconds, deadline });
+  // 加入串行队列，fire-and-forget
+  void enqueueTask(async () => {
+    // 任务开始执行时，状态从 pending 改为 running
+    const t = tasks.get(taskId);
+    if (t && t.status === 'pending') {
+      t.status = 'running';
+      t.message = '开始同步...';
+      t.updatedAt = Date.now();
+    }
+    await runSyncLoop(taskId, { fakeid, authKey, begin, pageSize, maxPages, intervalSeconds, deadline });
+  });
 
   return taskId;
 }
@@ -207,7 +252,7 @@ async function runSyncLoop(
         break;
       }
 
-      // 解析文章
+      // 解析文章（只取主条 itemidx=1，与原客户端逻辑一致）
       const articles: any[] = [];
       let oldestCreateTime = 0;
       for (const item of publishList) {
@@ -215,6 +260,8 @@ async function runSyncLoop(
         try {
           const info = JSON.parse(item.publish_info);
           for (const a of info.appmsgex || []) {
+            // 只保存主条文章（itemidx=1），跳过次条
+            if (a.itemidx && a.itemidx !== 1) continue;
             articles.push({
               key: `${fakeid}:${a.aid}`,
               fakeid,
@@ -260,9 +307,11 @@ async function runSyncLoop(
         break;
       }
 
-      // 检查是否还有更多
-      begin += pageSize;
-      if (publishList.length < pageSize) {
+      // 检查是否还有更多：begin 按实际返回的群发消息数推进（微信以消息为单位分页）
+      begin += publishList.length;
+      // 只有当返回的消息数明显不足（少于一半）时才认为同步完成
+      // 微信偶尔会返回不完整的页（如 18/20），不应误判为结束
+      if (publishList.length < Math.ceil(pageSize / 2)) {
         hasMore = false;
       }
 
@@ -284,14 +333,16 @@ async function runSyncLoop(
   }
 
   // 更新公众号统计
-  if (totalCount > 0) {
-    await updateAccountTotalCount(fakeid, totalCount);
-  }
   const db = getDatabase();
   const countRow = db
     .prepare('SELECT COUNT(*) as count FROM articles WHERE fakeid = ? AND is_deleted = 0')
     .get(fakeid) as { count: number };
-  await updateAccountSyncedCount(fakeid, countRow.count);
+
+  // total_count 和 synced_count 都以数据库实际数量为准
+  // 微信的 total_count 不可靠（可能是缓存的旧值），以实际同步到的为准
+  const actualCount = countRow.count;
+  await updateAccountTotalCount(fakeid, actualCount);
+  await updateAccountSyncedCount(fakeid, actualCount);
 
   // 标记完成
   task.status = 'completed';

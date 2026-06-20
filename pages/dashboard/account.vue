@@ -98,6 +98,9 @@
 	// 正在运行的后台任务（fakeid -> taskId）
 	const activeSyncTasks = ref<Map<string, string>>(new Map());
 
+	// 所有正在同步/排队的公众号 fakeid 集合（用于批量显示同步状态）
+	const syncingFakeids = computed(() => new Set(activeSyncTasks.value.keys()));
+
 	// 轮询定时器
 	const pollTimer = ref<number | null>(null);
 
@@ -219,13 +222,15 @@
 	  isCanceled.value = false;
 	}
 
-	// 同步单个公众号（从已同步位置继续）
+	// 同步单个公众号（增量：从已同步位置继续）
 	async function loadAccountArticle(account: Account) {
 	  if (!checkLogin()) return;
-	  await startBackgroundSync(account, {});
+	  // 查询已同步数量作为起始位置
+	  const begin = await getSyncedCount(account.fakeid);
+	  await startBackgroundSync(account, { begin });
 	}
 
-	// 同步所有选中的公众号（后台任务模式，切页面不中断）
+	// 同步所有选中的公众号（增量同步：从各自已同步位置继续）
 	async function loadSelectedAccountArticle() {
 	  if (!checkLogin()) return;
 	  isCanceled.value = false;
@@ -234,13 +239,16 @@
 	  const rows = getSelectedRows();
 
 	  for (const account of rows) {
+	    // 增量：从已同步位置继续，只拉新文章
+	    const begin = await getSyncedCount(account.fakeid);
 	    await startBackgroundSync(account, {
+	      begin,
 	      deadline: deadline > 0 ? deadline : undefined,
 	    });
 	  }
 	}
 
-	// 重新同步（强制从头开始）
+	// 重新同步（全量：强制从头 begin=0 开始）
 	async function resyncSelectedAccounts() {
 	  if (!checkLogin()) return;
 	  isCanceled.value = false;
@@ -253,6 +261,18 @@
 	      begin: 0,
 	      deadline: deadline > 0 ? deadline : undefined,
 	    });
+	  }
+	}
+
+	/**
+	 * 获取公众号已同步的文章数（作为增量同步的起始位置）
+	 */
+	async function getSyncedCount(fakeid: string): Promise<number> {
+	  try {
+	    const resp = await $fetch<{ data?: Account }>(`/api/web/data/v1/accounts/${fakeid}`);
+	    return resp?.data?.synced_count || 0;
+	  } catch {
+	    return 0;
 	  }
 	}
 
@@ -403,6 +423,7 @@
 	      isDeleting: isDeleting,
 	      isSyncing: isSyncing,
 	      syncingRowId: syncingRowId,
+	      syncingFakeids: syncingFakeids,
 	    },
 	    cellClass: 'flex justify-center items-center',
 	    maxWidth: 100,
@@ -666,7 +687,7 @@
                   :loading="isSyncing"
                   :disabled="isDeleting || !hasSelectedRows"
                   @click="loadSelectedAccountArticle"
-                  >同步</UButton
+                  >增量同步</UButton
                 >
                 <UButton
                   color="primary"
@@ -676,7 +697,7 @@
                   :loading="isSyncing"
                   :disabled="isDeleting || !hasSelectedRows"
                   @click="resyncSelectedAccounts"
-                  >重新同步</UButton
+                  >全量同步</UButton
                 >
 	        <div class="hidden xl:flex flex-1 justify-end">
 	          <span class="self-end text-sm text-blue-500 font-medium">同步范围: {{ getActualDateRange() }}</span>
