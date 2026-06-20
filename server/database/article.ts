@@ -402,6 +402,29 @@ export async function getAllArticlesByFakeid(fakeid: string): Promise<Article[]>
 }
 
 /**
+ * 跨公众号获取最近的 N 篇文章（用于 AI 选题分析）。
+ * 按创建时间倒序，带公众号名称，排除已删除。
+ */
+export async function getRecentArticlesForTopic(limit = 50): Promise<Article[]> {
+  try {
+    const db = getDatabase();
+    return db
+      .prepare(
+        `SELECT a.*, acc.nickname AS account_nickname, acc.alias AS account_alias
+         FROM articles a
+         LEFT JOIN accounts acc ON a.fakeid = acc.fakeid
+         WHERE a.is_deleted = 0
+         ORDER BY a.create_time DESC
+         LIMIT ?`
+      )
+      .all(Math.max(1, Math.min(200, limit))) as Article[];
+  } catch (error) {
+    console.error('getRecentArticlesForTopic failed:', error);
+    return [];
+  }
+}
+
+/**
  * 更新文章删除状态 (兼容旧接口)
  */
 export async function updateArticleDeletedStatus(key: string, isDeleted: boolean): Promise<boolean> {

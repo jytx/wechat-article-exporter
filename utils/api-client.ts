@@ -141,6 +141,13 @@ export class ApiClient {
   }
 
   /**
+   * PUT 请求
+   */
+  async put<T = any>(endpoint: string, body?: any): Promise<T> {
+    return this.request<T>(endpoint, { method: 'PUT', body });
+  }
+
+  /**
    * DELETE 请求
    */
   async delete<T = any>(endpoint: string): Promise<T> {
@@ -180,6 +187,7 @@ export const api = {
   get: <T = any>(endpoint: string, query?: Record<string, any>) => apiClient.get<T>(endpoint, query),
   post: <T = any>(endpoint: string, body?: any) => apiClient.post<T>(endpoint, body),
   patch: <T = any>(endpoint: string, body?: any) => apiClient.patch<T>(endpoint, body),
+  put: <T = any>(endpoint: string, body?: any) => apiClient.put<T>(endpoint, body),
   delete: <T = any>(endpoint: string) => apiClient.delete<T>(endpoint),
 };
 

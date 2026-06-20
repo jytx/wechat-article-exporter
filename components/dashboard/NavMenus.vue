@@ -11,6 +11,7 @@ const items = ref<NavItem[]>([
   { name: '公众号管理', icon: 'i-lucide:users', href: '/dashboard/account' },
   { name: '文章下载', icon: 'i-lucide:file-down', href: '/dashboard/article' },
   { name: '选题雷达', icon: 'i-lucide:radar', href: '/dashboard/hot' },
+  { name: 'AI 自动选题', icon: 'i-lucide:sparkles', href: '/dashboard/ai-topic', tags: ['AI'] },
   { name: '单篇文章下载', icon: 'i-lucide:file-text', href: '/dashboard/single' },
   { name: '合集下载', icon: 'i-lucide:library-big', href: '/dashboard/album' },
   { name: '公共代理', icon: 'i-lucide:globe', href: '/dashboard/proxy' },

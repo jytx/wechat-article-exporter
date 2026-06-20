@@ -10,6 +10,7 @@
         <SettingExport />
         <SettingMisc />
       </div>
+      <SettingAi />
       <!--      <div>-->
       <!--        <SettingDisplay />-->
       <!--      </div>-->
