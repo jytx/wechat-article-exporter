@@ -34,9 +34,11 @@
           <p><code class="text-rose-500 font-mono">https://wproxy-01.deno.dev</code></p>
           <p><code class="text-rose-500 font-mono">https://wproxy-01.deno.dev/</code></p>
         </div>
-        <UButton type="submit" @click="save" color="black" class="w-20 mt-5 justify-center disabled:bg-slate-10">{{
-          saveBtnText
-        }}</UButton>
+        <div class="mt-5">
+          <label class="block text-sm mb-1">代理认证密钥（可选）</label>
+          <UInput v-model="authorizationValue" class="font-mono w-full" placeholder="若代理需要鉴权才填，如 deno deploy 的 token" />
+        </div>
+        <UButton type="submit" @click="save" :loading="saving" color="black" class="w-20 mt-5 justify-center disabled:bg-slate-10">{{ saveBtnText }}</UButton>
       </div>
     </div>
   </UCard>
@@ -47,10 +49,15 @@ import ExternalLink from '~/components/base/ExternalLink.vue';
 import { docsWebSite } from '~/config';
 import usePreferences, { waitForLoaded } from '~/composables/usePreferences';
 import type { Preferences } from '~/types/preferences';
+import toastFactory from '~/composables/toast';
 
 const preferences: Ref<Preferences> = usePreferences() as unknown as Ref<Preferences>;
+const toast = toastFactory();
 
 const textareaValue = ref('');
+const authorizationValue = ref('');
+const saving = ref(false);
+
 const proxyList = computed(() => {
   return textareaValue.value
     .split('\n')
@@ -65,15 +72,46 @@ onMounted(async () => {
     if (configuredProxyList.length > 0) {
       textareaValue.value = configuredProxyList.join('\n');
     }
+    authorizationValue.value = (preferences.value as Preferences).privateProxyAuthorization || '';
   } catch (e) {}
 });
 
 const saveBtnText = ref('保存');
 async function save() {
-  saveBtnText.value = '保存成功';
-  setTimeout(() => {
+  if (saving.value) return;
+  saving.value = true;
+  saveBtnText.value = '保存中...';
+  try {
+    // 同步更新内存中的 preferences（触发 watch 自动保存）
     (preferences.value as Preferences).privateProxyList = proxyList.value;
+    (preferences.value as Preferences).privateProxyAuthorization = authorizationValue.value;
+
+    // 关键修复：显式立即 PUT，不再只依赖延迟的 watch（避免刷新丢失）
+    const items = [
+      { key: 'proxy_list', value: JSON.stringify(proxyList.value) },
+      { key: 'proxy_authorization', value: authorizationValue.value },
+    ];
+    const res = await fetch('/api/web/data/v1/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ items }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      saveBtnText.value = '保存成功';
+      toast.success('代理配置已保存', `共 ${proxyList.value.length} 个节点`);
+    } else {
+      throw new Error(data.error?.message || '保存失败');
+    }
+  } catch (e: any) {
     saveBtnText.value = '保存';
-  }, 1000);
+    toast.error('保存失败', e?.message);
+  } finally {
+    saving.value = false;
+    setTimeout(() => {
+      saveBtnText.value = '保存';
+    }, 2000);
+  }
 }
 </script>
