@@ -24,6 +24,7 @@ interface SyncAccountBody {
   maxPages?: number;
   intervalSeconds?: number;
   deadline?: number;
+  incremental?: boolean;
 }
 
 export default defineEventHandler(async event => {
@@ -61,6 +62,7 @@ export default defineEventHandler(async event => {
     maxPages: body.maxPages,
     intervalSeconds: body.intervalSeconds,
     deadline: body.deadline,
+    incremental: body.incremental,
   });
 
   console.log(`[sync-account] 已启动后台任务 ${taskId}，公众号 ${nickname}`);

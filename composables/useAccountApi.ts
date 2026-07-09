@@ -168,6 +168,7 @@ export function useAccountApi() {
       maxPages?: number;
       intervalSeconds?: number;
       deadline?: number;
+      incremental?: boolean;
     } = {},
   ): Promise<{
     taskId: string;

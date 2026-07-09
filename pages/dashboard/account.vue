@@ -116,7 +116,7 @@
 	 */
 	async function startBackgroundSync(
 	  account: Account,
-	  options: { begin?: number; deadline?: number } = {},
+	  options: { begin?: number; deadline?: number; maxPages?: number; incremental?: boolean } = {},
 	): Promise<void> {
 	  if (activeSyncTasks.value.has(account.fakeid)) {
 	    toast.info('提示', `${account.nickname} 正在同步中`);
@@ -222,15 +222,14 @@
 	  isCanceled.value = false;
 	}
 
-	// 同步单个公众号（增量：从已同步位置继续）
+	// 同步单个公众号（增量：从最新文章开始，翻到无新文章为止）
 	async function loadAccountArticle(account: Account) {
 	  if (!checkLogin()) return;
-	  // 查询已同步数量作为起始位置
-	  const begin = await getSyncedCount(account.fakeid);
-	  await startBackgroundSync(account, { begin });
+	  // begin=0 从最新开始；maxPages 限制翻页数，incremental 启用"连续无新增即停"
+	  await startBackgroundSync(account, { begin: 0, maxPages: 5, incremental: true });
 	}
 
-	// 同步所有选中的公众号（增量同步：从各自已同步位置继续）
+	// 同步所有选中的公众号（增量同步：从最新文章开始）
 	async function loadSelectedAccountArticle() {
 	  if (!checkLogin()) return;
 	  isCanceled.value = false;
@@ -239,11 +238,12 @@
 	  const rows = getSelectedRows();
 
 	  for (const account of rows) {
-	    // 增量：从已同步位置继续，只拉新文章
-	    const begin = await getSyncedCount(account.fakeid);
+	    // 增量：begin=0 从最新开始翻，连续两页无新增就停
 	    await startBackgroundSync(account, {
-	      begin,
+	      begin: 0,
+	      maxPages: 5,
 	      deadline: deadline > 0 ? deadline : undefined,
+	      incremental: true,
 	    });
 	  }
 	}
@@ -627,6 +627,35 @@
 
 	// 导出公众号
 	const exportBtnLoading = ref(false);
+
+	// 同步公众号信息（名称、头像、简介等）——只同步勾选的
+	const syncInfoLoading = ref(false);
+	async function syncAccountInfo() {
+	  if (!checkLogin()) return;
+	  const rows = getSelectedRows();
+	  if (rows.length === 0) {
+	    toast.warning('提示', '请先勾选要同步信息的公众号');
+	    return;
+	  }
+	  syncInfoLoading.value = true;
+	  try {
+	    const res = await $fetch<{ success: boolean; data: { updated: number; failed: number; total: number }; message?: string }>(
+	      '/api/web/data/v1/batch/sync-account-info',
+	      { method: 'POST', body: { fakeids: rows.map((r: Account) => r.fakeid) }, credentials: 'include' }
+	    );
+	    if (res.success) {
+	      toast.success('同步完成', `成功 ${res.data.updated} 个，失败 ${res.data.failed} 个`);
+	      await refresh();
+	    } else {
+	      toast.error('同步失败', res.message || '未知错误');
+	    }
+	  } catch (e: any) {
+	    toast.error('同步失败', e?.data?.message || e?.message);
+	  } finally {
+	    syncInfoLoading.value = false;
+	  }
+	}
+
 	async function exportAccount() {
 	  exportBtnLoading.value = true;
 	  try {
@@ -658,10 +687,11 @@
 	        <UButton icon="i-lucide:user-plus" color="blue" :disabled="isDeleting || addBtnLoading" @click="addAccount">
 	          {{ addBtnLoading ? '添加中...' : '添加' }}
 	        </UButton>
-	        <UButton icon="i-lucide:arrow-down-to-line" color="blue" :loading="importBtnLoading" @click="importAccount">
-	          批量导入
-	          <input ref="fileRef" type="file" accept=".json" class="hidden" @change="handleFileChange" />
-	        </UButton>
+        <UButton icon="i-lucide:arrow-down-to-line" color="blue" :loading="importBtnLoading" @click="importAccount">
+          批量导入
+          <input ref="fileRef" type="file" accept=".json" class="hidden" @change="handleFileChange" />
+        </UButton>
+        <BatchSearchAccounts @completed="refresh" />
 	        <UButton
 	          icon="i-lucide:arrow-up-from-line"
 	          color="blue"
@@ -669,8 +699,11 @@
 	          :disabled="!hasSelectedRows"
 	          @click="exportAccount"
 	        >
-	          批量导出
-	        </UButton>
+		         批量导出
+		        </UButton>
+		        <UButton icon="i-lucide:refresh-cw" color="blue" variant="soft" :loading="syncInfoLoading" :disabled="!hasSelectedRows" @click="syncAccountInfo">
+		          {{ syncInfoLoading ? '同步中...' : '同步信息' }}
+		        </UButton>
 	        <UButton
 	          color="rose"
 	          icon="i-lucide:user-minus"

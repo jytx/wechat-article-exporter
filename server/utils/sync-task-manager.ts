@@ -68,6 +68,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * 格式化同步完成提示。
+ * 差额（本地 < 微信总数）是正常的：次条、非图文消息、已删除文章会被跳过。
+ */
+function formatSyncCompleteMessage(newSynced: number, dbCount: number, wxTotal: number): string {
+  const diff = wxTotal - dbCount;
+  if (diff > 0) {
+    return `同步完成，本次新增 ${newSynced} 篇，该公众号共 ${dbCount} 篇（微信报告 ${wxTotal} 篇，差额 ${diff} 篇为次条/非图文/已删除，已自动跳过）`;
+  }
+  return `同步完成，本次新增 ${newSynced} 篇，该公众号共 ${dbCount} 篇`;
+}
+
 // ========== 串行任务队列 ==========
 // 同一时间只允许一个同步任务在跑，避免并发请求触发微信限流/杀 session
 let isRunningTask = false;
@@ -117,6 +129,7 @@ export function startSyncTask(params: {
   pageSize?: number;
   intervalSeconds?: number;
   deadline?: number;
+  incremental?: boolean;
 }): string {
   const taskId = `sync_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const { fakeid, nickname, authKey } = params;
@@ -153,7 +166,7 @@ export function startSyncTask(params: {
       t.message = '开始同步...';
       t.updatedAt = Date.now();
     }
-    await runSyncLoop(taskId, { fakeid, authKey, begin, pageSize, maxPages, intervalSeconds, deadline });
+    await runSyncLoop(taskId, { fakeid, authKey, begin, pageSize, maxPages, intervalSeconds, deadline, incremental: params.incremental || false });
   });
 
   return taskId;
@@ -169,16 +182,18 @@ async function runSyncLoop(
     maxPages: number;
     intervalSeconds: number;
     deadline: number;
+    incremental: boolean;
   },
 ) {
   const task = tasks.get(taskId);
   if (!task) return;
 
-  const { fakeid, authKey, pageSize, maxPages, intervalSeconds, deadline } = params;
+  const { fakeid, authKey, pageSize, maxPages, intervalSeconds, deadline, incremental } = params;
   let begin = params.begin;
   let totalSynced = 0;
   let totalCount = 0;
   let hasMore = true;
+  let noNewStreak = 0; // 连续无新增文章的页数（增量同步停止条件）
 
   // 从 CookieStore 获取 token 和 cookie（用 authKey，不依赖 event）
   const token = await cookieStore.getToken(authKey);
@@ -193,7 +208,7 @@ async function runSyncLoop(
     return;
   }
 
-  console.log(`[sync-task ${taskId}] 开始同步 ${fakeid}，begin=${begin}`);
+  console.log(`[sync-task ${taskId}] 开始同步 ${fakeid}，begin=${begin}，incremental=${incremental}，maxPages=${maxPages}`);
 
   for (let page = 0; page < maxPages && hasMore; page++) {
     try {
@@ -288,16 +303,29 @@ async function runSyncLoop(
         }
       }
 
-      // 保存
-      if (articles.length > 0) {
-        await saveArticles(articles);
-        totalSynced += articles.length;
+      // 保存（saveArticles 返回真正新增的数量）
+      const newCount = articles.length > 0 ? await saveArticles(articles) : 0;
+      totalSynced += newCount; // 只累加实际新增数，不是本页文章数
+
+      // 增量同步停止条件：连续 2 页都没有新增文章，说明已翻到旧的（全部已存在），停止。
+      // 仅在 incremental=true（增量同步）时启用；全量同步不受此限制，必须翻完。
+      if (incremental && newCount === 0 && articles.length > 0) {
+        noNewStreak++;
+        if (noNewStreak >= 2) {
+          task.message = `增量同步完成：已无新文章（共 ${totalSynced} 篇）`;
+          hasMore = false;
+          console.log(`[sync-task ${taskId}] 连续 ${noNewStreak} 页无新增，增量停止`);
+          break;
+        }
+      } else {
+        noNewStreak = 0;
       }
 
       // 更新进度
       task.synced = totalSynced;
       task.pagesDone = page + 1;
-      task.message = `已同步 ${totalSynced} 篇（第 ${page + 1} 页）`;
+      const newHint = newCount > 0 ? `，新增 ${newCount}` : '';
+      task.message = `已同步 ${totalSynced} 篇${newHint}（第 ${page + 1} 页）`;
       task.updatedAt = Date.now();
 
       // 检查截止时间
@@ -349,7 +377,7 @@ async function runSyncLoop(
   task.synced = totalSynced;
   task.totalWx = totalCount;
   task.dbCount = countRow.count;
-  task.message = `同步完成：新增 ${totalSynced} 篇，共 ${countRow.count}/${totalCount} 篇`;
+  task.message = formatSyncCompleteMessage(totalSynced, countRow.count, totalCount);
   task.finishedAt = Date.now();
   task.updatedAt = Date.now();
 

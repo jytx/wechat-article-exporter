@@ -68,11 +68,18 @@ export async function saveArticle(article: Article): Promise<boolean> {
 /**
  * 批量保存文章
  */
+/**
+ * 批量保存文章。使用 INSERT OR IGNORE，已存在的 key 不覆盖。
+ * @returns 新增的文章数量（已存在的不计）
+ */
 export async function saveArticles(articles: Article[]): Promise<number> {
+  if (articles.length === 0) return 0;
   try {
     const db = getDatabase();
+    // 用 INSERT OR IGNORE，这样已存在的 key 不会覆盖（避免重置 downloaded 等状态）
+    // 新增的才会写入，通过 changes 统计实际新增数
     const stmt = db.prepare(`
-      INSERT OR REPLACE INTO articles
+      INSERT OR IGNORE INTO articles
       (key, fakeid, aid, title, link, cover, author, create_time, update_time, datetime, digest, downloaded, is_deleted, album_id, appmsg_album_infos, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
     `);
@@ -99,8 +106,11 @@ export async function saveArticles(articles: Article[]): Promise<number> {
       }
     });
 
+    const before = db.prepare('SELECT COUNT(*) AS c FROM articles').get() as { c: number };
     insertMany(articles);
-    return articles.length;
+    const after = db.prepare('SELECT COUNT(*) AS c FROM articles').get() as { c: number };
+
+    return Math.max(0, after.c - before.c); // 真正新增的数量
   } catch (error) {
     console.error('saveArticles failed:', error);
     return 0;
@@ -404,20 +414,33 @@ export async function getAllArticlesByFakeid(fakeid: string): Promise<Article[]>
 /**
  * 跨公众号获取最近的 N 篇文章（用于 AI 选题分析）。
  * 按创建时间倒序，带公众号名称，排除已删除。
+ * @param limit  最大返回篇数（1-200）
+ * @param days   可选，仅取最近 N 天内的文章（0 或不传表示不限时间）
  */
-export async function getRecentArticlesForTopic(limit = 50): Promise<Article[]> {
+export async function getRecentArticlesForTopic(limit = 50, days = 0): Promise<Article[]> {
   try {
     const db = getDatabase();
+    const safeLimit = Math.max(1, Math.min(200, limit));
+    const params: any[] = [];
+
+    let where = 'WHERE a.is_deleted = 0';
+    if (days && days > 0) {
+      const cutoff = Math.floor(Date.now() / 1000) - days * 86400;
+      where += ' AND a.create_time >= ?';
+      params.push(cutoff);
+    }
+    params.push(safeLimit);
+
     return db
       .prepare(
         `SELECT a.*, acc.nickname AS account_nickname, acc.alias AS account_alias
          FROM articles a
          LEFT JOIN accounts acc ON a.fakeid = acc.fakeid
-         WHERE a.is_deleted = 0
+         ${where}
          ORDER BY a.create_time DESC
          LIMIT ?`
       )
-      .all(Math.max(1, Math.min(200, limit))) as Article[];
+      .all(...params) as Article[];
   } catch (error) {
     console.error('getRecentArticlesForTopic failed:', error);
     return [];
