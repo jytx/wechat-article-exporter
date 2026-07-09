@@ -38,6 +38,7 @@ import { createBooleanColumnFilterParams, createDateColumnFilterParams } from '~
 import { useArticleApiWithState, useArticleFilter } from '~/composables/useArticleApi';
 import type { Article as ApiArticle } from '~/types/api';
 import { exportArticlesToServer } from '~/utils/server-article-export';
+import SearchArticleDialog from '~/components/global/SearchArticleDialog.vue';
 import toastFactory from '~/composables/toast';
 
 useHead({
@@ -533,6 +534,134 @@ function updateRow(article: Article) {
   }
 }
 
+// ===== 全网文章搜索（从 single 页面搬来）=====
+const searchArticleDialogRef = ref<InstanceType<typeof SearchArticleDialog> | null>(null);
+
+function openSearchDialog() {
+  searchArticleDialogRef.value?.open();
+}
+
+/**
+ * 从微信文章 URL 解析出 biz(fakeid)、mid、idx、sn。
+ * URL 格式：https://mp.weixin.qq.com/s?__biz=xxx&mid=xxx&idx=xxx&sn=xxx
+ * 或短链 https://mp.weixin.qq.com/s/xxxxx（短链无法解析，返回 null）
+ */
+function parseWechatUrl(url: string): { fakeid: string; mid: string; idx: string; sn: string } | null {
+  try {
+    const u = new URL(url);
+    const biz = u.searchParams.get('__biz');
+    const mid = u.searchParams.get('mid');
+    const idx = u.searchParams.get('idx') || '1';
+    const sn = u.searchParams.get('sn') || '';
+    if (!biz || !mid) return null;
+    return { fakeid: biz, mid, idx, sn };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 从搜索结果选中文章：入库（文章+公众号）+ 同步插入列表 + 自动抓取正文。
+ * 关键：必须同时存公众号到 accounts 表，否则 articles.get 遍历 accounts 时查不到这篇文章。
+ */
+async function selectArticleFromSearch(article: any) {
+  try {
+    const link = article.link;
+    if (!link) {
+      toast.warning('提示', '该文章没有有效链接');
+      return;
+    }
+
+    // 从 URL 解析出真实的 biz/mid/idx，构造和微信一致的数据结构
+    const parsed = parseWechatUrl(link);
+    let fakeid: string;
+    let aid: string;
+    let key: string;
+
+    if (parsed) {
+      fakeid = parsed.fakeid;
+      aid = `${parsed.mid}_${parsed.idx}`;
+      key = `${parsed.fakeid}:${parsed.mid}_${parsed.idx}`;
+    } else {
+      toast.warning('提示', '该文章链接格式非标准（可能是短链），尝试用 URL 兜底入库');
+      fakeid = 'unknown';
+      aid = link;
+      key = `url:${link}`;
+    }
+
+    // 防重复
+    if (globalRowData.some(r => r.key === key || r.link === link)) {
+      toast.info('提示', '该文章已在列表中');
+      return;
+    }
+
+    const newRow: Article = {
+      key,
+      fakeid,
+      aid,
+      title: article.title || '未命名文章',
+      link,
+      cover: article.cover || '',
+      digest: article.digest || '',
+      author: article.author || article.account_nickname || '',
+      create_time: (article.create_time && article.create_time > 0) ? article.create_time : null,
+      update_time: (article.create_time && article.create_time > 0) ? article.create_time : null,
+      datetime: article.create_time_formatted || '',
+      downloaded: false,
+      is_deleted: false,
+      album_id: '',
+      appmsg_album_infos: [],
+    } as unknown as Article;
+
+    // 1. 入库（文章 + 公众号一起存，用专用接口确保公众号存在）
+    try {
+      await $fetch('/api/web/data/v1/batch/save-searched-article', {
+        method: 'POST',
+        body: {
+          article: {
+            key: newRow.key,
+            fakeid: newRow.fakeid,
+            aid: newRow.aid,
+            title: newRow.title,
+            link: newRow.link,
+            cover: newRow.cover || '',
+            author: newRow.author || '',
+            digest: newRow.digest || '',
+            create_time: newRow.create_time || null,
+            datetime: newRow.datetime || '',
+          },
+          account: {
+            fakeid: newRow.fakeid,
+            nickname: article.account_nickname || article.author || '未知公众号',
+            round_head_img: article.head_img_url || '',
+            signature: article.profile_description || '',
+          },
+        },
+        credentials: 'include',
+      });
+    } catch (e: any) {
+      console.error('搜索文章入库失败（不影响列表显示）:', e?.data?.message || e?.message);
+    }
+
+    // 2. 切到"全部"视图，清空筛选
+    selectedAccount.value = undefined;
+    searchKeyword.value = '';
+
+    // 3. 同步插入到列表头部 + 刷新表格
+    globalRowData.unshift(newRow);
+    await nextTick();
+    gridApi.value?.setGridOption('rowData', globalRowData);
+
+    toast.success('已添加', `"${newRow.title}" 已添加到列表，正在抓取正文...`);
+
+    // 4. 自动抓取该文章正文
+    download('html', [link]);
+  } catch (e: any) {
+    console.error('从搜索添加文章失败:', e);
+    toast.error('添加失败', e?.data?.message || e?.message || '添加失败');
+  }
+}
+
 // 处理页码输入
 function handlePageInput() {
   const page = Math.max(1, Math.min(pagination.value.totalPages, Number(inputPage.value) || 1));
@@ -812,6 +941,7 @@ function copyWechatLink() {
                 </span>
               </template>
             </UInput>
+            <UButton color="white" icon="i-lucide:search" @click="openSearchDialog">全网搜索</UButton>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -997,5 +1127,8 @@ function copyWechatLink() {
     </div>
 
     <PreviewArticle ref="previewArticleRef" />
+
+    <!-- 全网文章搜索对话框（含 iframe 预览） -->
+    <SearchArticleDialog ref="searchArticleDialogRef" @select:article="selectArticleFromSearch" />
   </div>
 </template>

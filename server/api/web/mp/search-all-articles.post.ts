@@ -45,6 +45,28 @@ function decodeHtmlEntities(text: string): string {
   return text.replace(/&[a-zA-Z0-9#]+;/g, entity => entities[entity] || entity);
 }
 
+/**
+ * 判断文章是否为中文或英文内容（过滤掉维吾尔文、藏文、阿拉伯文等）。
+ * 规则：标题里若含「其他文字字符」（阿拉伯/西里尔/藏/缅/泰等字母），
+ * 且这些字符占比明显，则视为非中英文文章。
+ */
+function isLikelyChineseOrEnglishArticle(article: any): boolean {
+  const title = (article.title || '') as string;
+  if (!title.trim()) return true; // 空标题不过滤
+
+  // 其他文字字符范围：阿拉伯、西里尔(俄文)、藏文、泰文、缅文、天城文等
+  // 参考 Unicode 区块，这些语言用非 CJK/非拉丁字母
+  const otherScriptRe =
+    /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0400-\u04FF\u0500-\u052F\u0F00-\u0FFF\u0E00-\u0E7F\u1000-\u109F\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0B80-\u0BFF\u0C00-\u0C7F\u0D00-\u0D7F\u0E80-\u0EFF]/g;
+
+  const otherMatches = title.match(otherScriptRe);
+  const otherCount = otherMatches ? otherMatches.length : 0;
+
+  // 如果其他文字字符 >= 2 个，认为是非中英文文章（中文/英文标题里几乎不会出现这些）
+  // 阈值 2 是为了允许偶发的特殊符号，但连续的其他语言字母会命中
+  return otherCount < 2;
+}
+
 export default defineEventHandler(async event => {
   const token = await getTokenFromStore(event);
   if (!token) {
@@ -128,7 +150,9 @@ export default defineEventHandler(async event => {
       let articles: any[] = [];
 
       if (response.list && Array.isArray(response.list)) {
-        articles = response.list.map((article: any) => {
+        articles = response.list
+          .filter((article: any) => isLikelyChineseOrEnglishArticle(article))
+          .map((article: any) => {
           // 确保 URL 使用 HTTPS
           let url = article.url || '';
           if (url.startsWith('http://')) {
@@ -140,8 +164,9 @@ export default defineEventHandler(async event => {
             appmsgid: url || '',
             title: decodeHtmlEntities(article.title || ''),
             account_nickname: article.nickname || '未知公众号',
-            create_time: Date.now() / 1000, // 响应中没有时间戳，使用当前时间
-            create_time_formatted: '刚刚',
+            // 微信版权查询接口不返回发布时间，留空不显示（避免误导）
+            create_time: 0,
+            create_time_formatted: '',
             cover: article.cover_url || '',
             cover_url_1_1: article.cover_url_1_1 || '',
             pic_cdn_url_1_1: article.cover_url_1_1 || '',
@@ -156,7 +181,10 @@ export default defineEventHandler(async event => {
       }
 
       const totalReturned = response.total || articles.length;
-      const hasMore = articles.length >= count;
+      // hasMore 判断：用"已加载范围 < 总数"，而不是"单次返回 >= count"。
+      // 微信接口单次返回数经常少于 count（如请求 20 实际返回 18），
+      // 用 returned>=count 会误判为没有更多了。
+      const hasMore = begin + articles.length < totalReturned;
 
       console.log(
         `[search-all-articles] keyword="${keyword}" begin=${begin} count=${count} returned=${articles.length} total=${totalReturned} hasMore=${hasMore}`,

@@ -21,7 +21,10 @@
 
     <!-- 搜索历史 -->
     <div v-if="searchHistory.length > 0 && !keyword" class="space-y-1">
-      <p class="text-xs text-gray-500 dark:text-gray-400">搜索历史</p>
+      <div class="flex items-center justify-between">
+        <p class="text-xs text-gray-500 dark:text-gray-400">搜索历史</p>
+        <button class="text-xs text-gray-400 hover:text-rose-500" type="button" @click="clearHistory">清除</button>
+      </div>
       <div class="flex flex-wrap gap-2">
         <button
           v-for="(item, index) in searchHistory"
@@ -52,7 +55,27 @@ const emit = defineEmits<{
 
 const keyword = ref(props.modelValue);
 const inputRef = ref<HTMLInputElement | null>(null);
-const searchHistory = ref<string[]>([]);
+
+// 搜索历史持久化到 localStorage，避免刷新/重开抽屉丢失
+const HISTORY_KEY = 'wx-article-search-history';
+const searchHistory = ref<string[]>(loadHistory());
+
+function loadHistory(): string[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(searchHistory.value));
+  } catch {
+    // 忽略存储失败
+  }
+}
 
 // 监听 modelValue 变化
 watch(
@@ -74,12 +97,13 @@ function handleSearch() {
   const trimmed = keyword.value.trim();
   if (!trimmed) return;
 
-  // 添加到搜索历史
+  // 添加到搜索历史（去重 + 置顶 + 最多 10 条）
   if (!searchHistory.value.includes(trimmed)) {
     searchHistory.value.unshift(trimmed);
     if (searchHistory.value.length > 10) {
       searchHistory.value = searchHistory.value.slice(0, 10);
     }
+    saveHistory();
   }
 
   emit('search');
@@ -102,11 +126,18 @@ function clearInput() {
 }
 
 /**
- * 重置表单
+ * 清除所有搜索历史
+ */
+function clearHistory() {
+  searchHistory.value = [];
+  saveHistory();
+}
+
+/**
+ * 重置表单（注意：不清空历史，只清空当前关键词）
  */
 function reset() {
   keyword.value = '';
-  searchHistory.value = [];
 }
 
 defineExpose({
