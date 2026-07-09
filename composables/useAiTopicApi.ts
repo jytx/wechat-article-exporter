@@ -78,6 +78,46 @@ export interface TopicRunDetail {
   topics?: AiTopic[];
 }
 
+/** 正文补抓任务状态 */
+export interface ContentFetchTask {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  phase: 'querying' | 'fetching' | 'done';
+  message: string;
+  total: number;
+  done: number;
+  failed: number;
+  days: number;
+  startedAt: number;
+  updatedAt: number;
+  finishedAt?: number;
+  error?: string;
+}
+
+/** 正文覆盖率统计 */
+export interface ContentCoverage {
+  total: number;
+  withContent: number;
+}
+
+/** GET /topic/fetch-status 的响应 */
+export interface FetchStatusResponse {
+  found?: boolean;
+  task?: ContentFetchTask;
+  active?: number;
+  tasks?: ContentFetchTask[];
+  coverage?: ContentCoverage;
+}
+
+/** 待下载正文的文章（来自 pending-articles 接口） */
+export interface PendingArticle {
+  url: string;
+  fakeid: string;
+  title: string;
+  digest?: string;
+  account_nickname?: string;
+}
+
 export interface TopicListResponse {
   items: AiTopic[];
   pagination: {
@@ -98,6 +138,10 @@ export interface AiConfigDto {
   model: string;
   suggestionCount: number;
   systemPrompt?: string;
+  /** 取最近多少天的文章（0=不限时间） */
+  articleDays: number;
+  /** 喂给 AI 的最大文章篇数 */
+  articleLimit: number;
 }
 
 export interface EmailConfigDto {
@@ -165,9 +209,26 @@ export function useAiTopicApi() {
     return api.get(`/topic/run/${batchId}`);
   }
 
-  /** 批量删除选题 */
+/** 批量删除选题 */
   async function deleteTopics(ids: number[]): Promise<{ deleted: number }> {
     return api.post('/topic/delete', { ids });
+  }
+
+  // ---- 正文补抓 ----
+
+  /** 触发批量补抓文章正文 */
+  async function fetchContent(params?: { days?: number; limit?: number }): Promise<{ taskId: string; alreadyRunning?: boolean }> {
+    return api.post('/topic/fetch-content', params || {});
+  }
+
+  /** 查询正文补抓进度（含正文覆盖率） */
+  async function getFetchStatus(taskId?: string): Promise<FetchStatusResponse> {
+    return api.get('/topic/fetch-status', taskId ? { taskId } : {});
+  }
+
+  /** 查询最近 N 天未下载正文的文章列表（给前端浏览器去抓） */
+  async function getPendingArticles(params?: { days?: number; limit?: number }): Promise<{ items: PendingArticle[]; count: number }> {
+    return api.get('/topic/pending-articles', params || {});
   }
 
   return {
@@ -179,5 +240,8 @@ export function useAiTopicApi() {
     sendTestEmail,
     getRunDetail,
     deleteTopics,
+    fetchContent,
+    getFetchStatus,
+    getPendingArticles,
   };
 }

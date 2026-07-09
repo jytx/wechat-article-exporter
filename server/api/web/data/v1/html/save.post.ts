@@ -4,6 +4,7 @@
  */
 
 import { saveArticleHtml } from '~/server/database/html';
+import { extractAndSaveContent } from '~/server/database/article-content';
 import { successResponse, createApiError, ErrorCodes, validateParams } from '~/server/utils/api-response';
 
 interface SaveHtmlBody {
@@ -25,7 +26,7 @@ export default defineEventHandler(async event => {
       throw createApiError(ErrorCodes.MISSING_PARAMETER, `缺少必需参数: ${validation.missing?.join(', ')}`);
     }
 
-    // 保存 HTML 内容
+    // 保存 HTML 内容（原始，给导出用）
     const success = await saveArticleHtml({
       url: body.url,
       fakeid: body.fakeid,
@@ -40,6 +41,15 @@ export default defineEventHandler(async event => {
         message: '保存文章内容失败',
       });
     }
+
+    // 同步提取纯文本正文存到 article_content（给 AI 选题用）。
+    // 失败不影响 HTML 保存结果（纯文本是衍生数据）。
+    void extractAndSaveContent({
+      url: body.url,
+      fakeid: body.fakeid,
+      title: body.title,
+      html: body.content,
+    });
 
     return successResponse(
       {

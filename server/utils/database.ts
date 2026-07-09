@@ -183,6 +183,20 @@ function initializeSchema(database: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_ai_topic_runs_batch ON ai_topic_runs(batch_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_topic_runs_batch_unique ON ai_topic_runs(batch_id);
   `);
+
+  // 文章纯文本正文表（cheerio 从原始 HTML 提取，给 AI 读取用，~5KB/篇）
+  // 与 article_html（原始HTML，给导出用）并存，互不干扰
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS article_content (
+      url TEXT PRIMARY KEY,
+      fakeid TEXT,
+      title TEXT,
+      content TEXT,
+      fetched_at INTEGER DEFAULT (strftime('%s', 'now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_article_content_fakeid ON article_content(fakeid);
+  `);
 }
 
 /**

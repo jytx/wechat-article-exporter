@@ -52,6 +52,15 @@
             <label class="block text-sm mb-1">生成选题数量</label>
             <UInput v-model.number="cfg.aiConfig.suggestionCount" type="number" :min="1" :max="10" class="w-32" />
           </div>
+          <div>
+            <label class="block text-sm mb-1">分析文章的时间范围</label>
+            <USelect v-model.number="cfg.aiConfig.articleDays" :options="articleDaysOptions" option-attribute="label" value-attribute="value" class="w-40" />
+          </div>
+          <div>
+            <label class="block text-sm mb-1">喂给 AI 的最大文章数</label>
+            <UInput v-model.number="cfg.aiConfig.articleLimit" type="number" :min="5" :max="30" class="w-32" />
+            <p class="text-xs text-gray-400 mt-1">喂正文时建议 ≤15 篇（每篇正文约 3000 token，过多会超模型上下文）</p>
+          </div>
           <div class="md:col-span-2">
             <label class="block text-sm mb-1">自定义 System Prompt（可选，留空用默认）</label>
             <UTextarea v-model="cfg.aiConfig.systemPrompt" :rows="3" class="w-full" placeholder="留空则使用内置的科技主编人设 prompt" />
@@ -151,7 +160,7 @@ const testingEmail = ref(false);
 // 加载配置期间禁止 provider 的 watch 自动填充预设，避免把用户自定义的 model/baseUrl 覆盖掉
 let skipProviderWatch = true;
 const cfg = ref<TopicConfig>({
-  aiConfig: { provider: 'deepseek', apiKey: '', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', suggestionCount: 5, systemPrompt: '' },
+  aiConfig: { provider: 'deepseek', apiKey: '', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', suggestionCount: 5, systemPrompt: '', articleDays: 7, articleLimit: 10 },
   emailConfig: { enabled: false, smtpHost: '', smtpPort: 465, smtpSecure: true, smtpUser: '', smtpPass: '', from: '', to: [] },
   topicSchedule: { enabled: false, cron: '0 9 * * *' },
 });
@@ -174,6 +183,17 @@ const providerOptions = [
   { label: 'Moonshot (Kimi)', value: 'moonshot' },
   { label: '通义千问 (DashScope)', value: 'qwen' },
   { label: '自定义', value: 'custom' },
+];
+
+// 分析文章的时间范围选项（天）。0 = 不限时间，取全部
+const articleDaysOptions = [
+  { label: '最近 1 天', value: 1 },
+  { label: '最近 3 天', value: 3 },
+  { label: '最近 7 天', value: 7 },
+  { label: '最近 14 天', value: 14 },
+  { label: '最近 30 天', value: 30 },
+  { label: '最近 90 天', value: 90 },
+  { label: '全部（不限时间）', value: 0 },
 ];
 
 // 切换服务商时填充常用 baseUrl / model

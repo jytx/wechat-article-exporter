@@ -10,17 +10,23 @@ export interface AiConfig {
   model: string;
   suggestionCount: number;
   systemPrompt?: string;
+  /** 取最近多少天的文章（0=不限时间） */
+  articleDays?: number;
+  /** 喂给 AI 的最大文章篇数 */
+  articleLimit?: number;
 }
 
 /** 喂给 AI 的文章素材（公众号文章满足此结构） */
 export interface AiArticle {
   title: string;
   link?: string;
-  /** 摘要 */
+  /** 摘要（digest，质量参差，作为正文缺失时的降级） */
   summary?: string;
   /** 来源（公众号名称） */
   source?: string;
   publishedAt?: number;
+  /** 纯文本正文（有则用正文，无则降级用 summary） */
+  content?: string;
 }
 
 /** 单条 AI 选题建议 */
@@ -67,17 +73,33 @@ const DEFAULT_SYSTEM_PROMPT = `你是一位资深的科技内容主编，擅长�
 严格返回如下 JSON（不要包含任何解释文字、不要 markdown 代码块）：
 {"suggestions":[{"title":"...","angle":"...","summary":"...","keywords":["..."],"references":[{"title":"...","link":"...","source":"..."}]}]}`;
 
-/** 构造 user message：把文章压成紧凑文本 */
+/** 每篇正文喂给 AI 的最大字符数（控制 token，~2000字≈1200token） */
+const CONTENT_CHARS_PER_ARTICLE = 2000;
+
+/** 构造 user message：优先用正文，无正文降级用摘要 */
 function buildUserMessage(articles: AiArticle[], limit: number): string {
   const slice = articles.slice(0, limit);
   const lines = slice.map((a, i) => {
     const parts = [`[${i + 1}] ${a.title}`];
-    if (a.summary) parts.push(`    摘要：${a.summary}`);
+    // 优先正文，其次摘要
+    const body = a.content
+      ? a.content.slice(0, CONTENT_CHARS_PER_ARTICLE)
+      : a.summary;
+    if (body) {
+      parts.push(a.content ? `    正文：${body}` : `    摘要：${body}`);
+    }
     if (a.source) parts.push(`    来源：${a.source}`);
-    if (a.link) parts.push(`    链接：${a.link}`);
     return parts.join('\n');
   });
-  return `以下是最近抓取到的 ${slice.length} 篇公众号文章，请据此生成选题建议：\n\n${lines.join('\n\n')}`;
+
+  // 统计有多少篇带正文，给 AI 一个信号
+  const withContent = slice.filter(a => a.content).length;
+  const contentHint =
+    withContent > 0
+      ? `（其中 ${withContent} 篇提供了完整正文，请重点依据正文内容分析）`
+      : '（注：以下仅提供摘要，正文尚未抓取，分析质量可能受限）';
+
+  return `以下是最近抓取到的 ${slice.length} 篇公众号文章${contentHint}，请据此生成选题建议：\n\n${lines.join('\n\n')}`;
 }
 
 /**

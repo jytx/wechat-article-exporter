@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Sparkles, RefreshCw, Mail, AlertCircle, CheckCircle2, Loader2, Eye } from 'lucide-vue-next';
 import { websiteName } from '~/config';
-import { useAiTopicApi, type AiTopic, type TopicTask, type TopicTaskTrace, type TopicRun } from '~/composables/useAiTopicApi';
+import { useAiTopicApi, type AiTopic, type TopicTask, type TopicTaskTrace, type ContentFetchTask, type ContentCoverage } from '~/composables/useAiTopicApi';
 import toastFactory from '~/composables/toast';
 
 useHead({ title: `AI 自动选题 | ${websiteName}` });
@@ -389,6 +389,75 @@ async function loadStatus() {
   }
 }
 
+// ========== 正文补抓 ==========
+const fetchingContent = ref(false);
+const fetchTask = ref<ContentFetchTask | null>(null);
+let fetchPollTimer: ReturnType<typeof setInterval> | null = null;
+const coverage = ref<ContentCoverage | null>(null);
+
+const coveragePercent = computed(() => {
+  if (!coverage.value || coverage.value.total === 0) return 0;
+  return Math.round((coverage.value.withContent / coverage.value.total) * 100);
+});
+
+async function loadCoverage() {
+  try {
+    const res = await topicApi.getFetchStatus();
+    coverage.value = res.coverage || null;
+    // 若有运行中的补抓任务，恢复轮询
+    const active = res.tasks?.[0];
+    if (active && active.status === 'running') {
+      fetchTask.value = active;
+      fetchingContent.value = true;
+      startFetchPolling(active.id);
+    }
+  } catch {
+    // 忽略
+  }
+}
+
+async function startFetchContent() {
+  if (fetchingContent.value) return;
+  fetchingContent.value = true;
+  try {
+    const res = await topicApi.fetchContent();
+    toast.info('正文补抓已开始', '服务端直连抓取，完成后自动提取纯文本');
+    startFetchPolling(res.taskId);
+  } catch (e: any) {
+    fetchingContent.value = false;
+    toast.error('启动失败', e?.message);
+  }
+}
+
+function startFetchPolling(taskId: string) {
+  stopFetchPolling();
+  fetchPollTimer = setInterval(async () => {
+    try {
+      const res = await topicApi.getFetchStatus(taskId);
+      fetchTask.value = res.task || null;
+      if (res.task && (res.task.status === 'completed' || res.task.status === 'failed')) {
+        stopFetchPolling();
+        fetchingContent.value = false;
+        await loadCoverage(); // 刷新覆盖率
+        if (res.task.status === 'completed') {
+          toast.success('正文补抓完成', `成功 ${res.task.done} 篇${res.task.failed > 0 ? `，失败 ${res.task.failed} 篇` : ''}`);
+        } else {
+          toast.error('补抓失败', res.task.error || res.task.message);
+        }
+      }
+    } catch (e: any) {
+      console.warn('轮询补抓状态失败:', e?.message);
+    }
+  }, 2000);
+}
+
+function stopFetchPolling() {
+  if (fetchPollTimer) {
+    clearInterval(fetchPollTimer);
+    fetchPollTimer = null;
+  }
+}
+
 function goPrev() {
   if (currentPage.value > 1) {
     currentPage.value--;
@@ -405,12 +474,13 @@ function goNext() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadTopics(), loadStatus()]);
+  await Promise.all([loadTopics(), loadStatus(), loadCoverage()]);
 });
 
 onBeforeUnmount(() => {
   stopPolling();
   stopElapsed();
+  stopFetchPolling();
 });
 </script>
 
@@ -426,6 +496,19 @@ onBeforeUnmount(() => {
         </UBadge>
       </div>
       <div class="flex items-center gap-2">
+        <UButton
+          icon="i-lucide:download-cloud"
+          color="blue"
+          variant="soft"
+          size="sm"
+          :loading="fetchingContent"
+          :disabled="fetchingContent"
+          @click="startFetchContent"
+          >补抓文章正文</UButton
+        >
+        <UBadge v-if="coverage" :color="coveragePercent >= 80 ? 'green' : coveragePercent >= 30 ? 'amber' : 'rose'" variant="subtle" size="xs">
+          正文覆盖 {{ coveragePercent }}%（{{ coverage.withContent }}/{{ coverage.total }}）
+        </UBadge>
         <UButton
           v-if="lastTrace || currentTask?.batchId"
           icon="i-lucide:eye"
@@ -482,6 +565,23 @@ onBeforeUnmount(() => {
         @click="openLiveTrace"
         >查看分析过程</UButton
       >
+    </div>
+
+    <!-- 正文补抓进度条 -->
+    <div
+      v-if="fetchTask && fetchingContent"
+      class="flex items-center gap-3 border-b border-slate-200 dark:border-slate-700 px-3 py-2 bg-blue-50 dark:bg-slate-800/50"
+    >
+      <Loader2 class="size-4 text-blue-500 animate-spin" />
+      <div class="flex-1 min-w-0">
+        <div class="text-sm text-slate-700 dark:text-slate-200 truncate">
+          {{ fetchTask.message }}
+        </div>
+        <div class="text-xs text-slate-500">
+          进度：{{ fetchTask.done }}/{{ fetchTask.total }}
+          <span v-if="fetchTask.failed > 0" class="text-rose-500">· 失败 {{ fetchTask.failed }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- 选题列表 -->

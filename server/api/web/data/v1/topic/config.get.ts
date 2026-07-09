@@ -35,6 +35,8 @@ export default defineEventHandler(async () => {
       model: aiConfig.model || 'deepseek-chat',
       suggestionCount: aiConfig.suggestionCount ?? 5,
       systemPrompt: aiConfig.systemPrompt || '',
+      articleDays: aiConfig.articleDays ?? 7,
+      articleLimit: aiConfig.articleLimit ?? 10,
     },
     emailConfig: {
       enabled: emailConfig.enabled ?? false,

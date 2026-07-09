@@ -17,6 +17,7 @@ import {
   type AiTopicRun,
 } from '~/server/database/topic';
 import { getRecentArticlesForTopic, type Article } from '~/server/database/article';
+import { getContentsByUrls } from '~/server/database/article-content';
 import {
   generateTopicSuggestions,
   type AiConfig,
@@ -186,17 +187,19 @@ async function runTopicLoop(taskId: string) {
       return;
     }
 
-    // 2. 加载已同步的公众号文章（取最近 50 篇，跨公众号、按时间倒序）
+    // 2. 加载已同步的公众号文章（按配置的时间范围 + 数量上限，跨公众号、按时间倒序）
     task.phase = 'loading_articles';
-    touch('正在加载已同步的公众号文章...');
-    console.log(`[topic-task ${taskId}] 加载公众号文章`);
+    const articleDays = aiConfig.articleDays ?? 7;
+    const articleLimit = aiConfig.articleLimit ?? 50;
+    const daysHint = articleDays > 0 ? `最近 ${articleDays} 天的` : '全部';
+    touch(`正在加载${daysHint}公众号文章...`);
+    console.log(`[topic-task ${taskId}] 加载公众号文章（days=${articleDays}, limit=${articleLimit}）`);
 
-    const ARTICLE_LIMIT = 50;
-    const dbArticles = await getRecentArticlesForTopic(ARTICLE_LIMIT);
+    const dbArticles = await getRecentArticlesForTopic(articleLimit, articleDays);
     task.totalArticles = dbArticles.length;
 
     if (dbArticles.length === 0) {
-      fail('没有已同步的公众号文章，请先在「公众号管理」同步文章');
+      fail(articleDays > 0 ? `最近 ${articleDays} 天没有已同步的文章，请先同步或扩大时间范围` : '没有已同步的公众号文章，请先在「公众号管理」同步文章');
       return;
     }
 
@@ -209,7 +212,24 @@ async function runTopicLoop(taskId: string) {
       publishedAt: a.create_time,
     }));
 
-    touch(`已加载 ${articles.length} 篇公众号文章，正在调用 AI 分析...`);
+    // 批量加载已抓取的纯文本正文（有正文的文章优先用正文，没有的降级用摘要）
+    touch(`已加载 ${articles.length} 篇文章，正在读取正文...`);
+    const urls = articles.map(a => a.link).filter(Boolean) as string[];
+    const contentMap = await getContentsByUrls(urls);
+    let withContent = 0;
+    for (const a of articles) {
+      if (a.link && contentMap.has(a.link)) {
+        a.content = contentMap.get(a.link);
+        if (a.content) withContent++;
+      }
+    }
+
+    const contentHint =
+      withContent > 0
+        ? `（${withContent}/${articles.length} 篇有正文）`
+        : '（无正文，建议先点「补抓文章正文」）';
+    touch(`已加载 ${articles.length} 篇文章${contentHint}，正在调用 AI 分析...`);
+    console.log(`[topic-task ${taskId}] ${withContent}/${articles.length} 篇有正文`);
 
     // 3. 调用 AI
     task.phase = 'calling_ai';
@@ -220,6 +240,8 @@ async function runTopicLoop(taskId: string) {
       model: aiConfig.model || 'deepseek-chat',
       suggestionCount: aiConfig.suggestionCount || 5,
       systemPrompt: aiConfig.systemPrompt,
+      articleDays,
+      articleLimit,
     };
 
     const { suggestions, trace } = await generateTopicSuggestions(fullAiConfig, articles);

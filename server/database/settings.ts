@@ -50,6 +50,8 @@ const DEFAULT_SETTINGS: SettingItem[] = [
       model: 'deepseek-chat',
       suggestionCount: 5,
       systemPrompt: '',
+      articleDays: 7,
+      articleLimit: 10,
     }),
   },
   {
