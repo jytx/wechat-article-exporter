@@ -32,13 +32,15 @@ async function open(article: AppMsgEx) {
   if (htmlAsset) {
     isOpen.value = true;
     const rawHtml = htmlAsset.content;
-    console.log('rawHtml type:', typeof rawHtml);
-    console.log('rawHtml length:', rawHtml?.length);
-    console.log('rawHtml preview:', rawHtml?.substring(0, 200));
     const cgiData = await parseCgiDataNew(rawHtml);
-    console.log(cgiData);
 
-    // articleHtml.value = await normalizeHtmlForPreview(htmlAsset, rawHtml);
+    // 解析失败（cgiData 为 null）时给出提示，避免下游 renderHTMLFromCgiDataNew 空指针崩溃
+    if (!cgiData) {
+      toast.warning('预览失败', `文章【${article.title}】内容格式无法解析，可能未正确拉取`);
+      isOpen.value = false;
+      return;
+    }
+
     articleHtml.value = await renderHTMLFromCgiDataNew(
       cgiData,
       (preferences.value as Preferences).exportConfig.exportHtmlIncludeComments
