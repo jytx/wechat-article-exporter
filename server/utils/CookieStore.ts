@@ -4,6 +4,20 @@ import { CookieKVValue, getMpCookie, setMpCookie } from '~/server/database/cooki
 // 表示一条 set-cookie 记录的解析结果
 export type CookieEntity = Record<string, string | number>;
 
+/**
+ * 关键 session cookie：微信登录态的核心标识。
+ * 这些 cookie 若被微信置为 EXPIRED，说明 session 确实失效，
+ * 必须覆盖旧值（让失效状态暴露），而不是像其它 cookie 那样保留旧值。
+ */
+const SESSION_COOKIE_NAMES = new Set([
+  'slave_sid',
+  'slave_sid_cert',
+  'slave_user',
+  'xid',
+  'wuxun',
+  'wxtoken',
+]);
+
 // 公众号所有的 set-cookie 解析结果
 export class AccountCookie {
   private readonly _token: string;
@@ -56,11 +70,13 @@ export class AccountCookie {
   }
 
   /**
-   * 合并新的 set-cookie 到现有 cookie 中
-   * 新 cookie 会覆盖同名的旧 cookie
+   * 合并新的 set-cookie 到现有 cookie 中，新 cookie 会覆盖同名的旧 cookie。
    *
-   * 注意：微信在 session 过期时会返回 value 为 "EXPIRED" 的 cookie（如 slave_sid=EXPIRED），
-   * 这类 cookie 不会被写入，以保留上一次有效的 session cookie，避免覆盖导致彻底失效。
+   * 关于 EXPIRED 的处理：
+   * - 关键 session cookie（见 SESSION_COOKIE_NAMES）收到 EXPIRED/空值时照常覆盖，
+   *   因为微信返回 EXPIRED 表示 session 确实失效，必须让这个状态暴露出来，
+   *   否则旧 session cookie 会永久驻留内存，重新登录后仍被读到（曾导致 session 过期 bug）。
+   * - 普通跟踪类 cookie 仍跳过 EXPIRED/空值，保留旧值。
    */
   public update(newCookies: string[]): void {
     const parsed = AccountCookie.parse(newCookies);
@@ -71,15 +87,17 @@ export class AccountCookie {
         cookieMap.set(cookie.name as string, cookie);
       }
     }
-    // 用新的覆盖（跳过 EXPIRED 和空值，避免微信返回的过期标记覆盖有效 session）
+    // 用新的覆盖
     for (const cookie of parsed) {
       if (cookie.name) {
+        const name = cookie.name as string;
         const value = (cookie.value as string) || '';
-        if (value.toUpperCase() === 'EXPIRED' || value === '') {
-          // 微信返回的 EXPIRED 标记，跳过，保留原有的有效 cookie
+        const isExpired = value.toUpperCase() === 'EXPIRED' || value === '';
+        // 关键 session cookie 收到 EXPIRED 必须覆盖；普通 cookie 跳过 EXPIRED 保留旧值
+        if (isExpired && !SESSION_COOKIE_NAMES.has(name)) {
           continue;
         }
-        cookieMap.set(cookie.name as string, cookie);
+        cookieMap.set(name, cookie);
       }
     }
     this._cookie = Array.from(cookieMap.values());
@@ -231,6 +249,34 @@ class CookieStore {
    */
   removeCookie(authKey: string): void {
     this.store.delete(authKey);
+  }
+
+  /**
+   * 把一个 authKey 下的 cookie 迁移到另一个 authKey（用于登录后将临时 auth-key 迁移到用户固定 token）。
+   *
+   * 关键：同时更新内存缓存和 SQLite，避免「内存优先」读取到迁移前的旧 cookie。
+   * 之前只写 SQLite 不刷内存，导致重新扫码登录后同步仍读到旧 cookie → session 过期。
+   *
+   * @param fromAuthKey 源 authKey（临时）
+   * @param toAuthKey   目标 authKey（用户固定 token）
+   * @return 是否迁移成功（源不存在则返回 false）
+   */
+  async migrateCookie(fromAuthKey: string, toAuthKey: string): Promise<boolean> {
+    const source = await this.getAccountCookie(fromAuthKey);
+    if (!source) {
+      return false;
+    }
+
+    // 写入目标 authKey：内存 + SQLite 一起更新
+    this.store.delete(toAuthKey);
+    this.evictIfNeeded();
+    this.store.set(toAuthKey, source);
+    const ok = await setMpCookie(toAuthKey, source.toJSON());
+
+    // 清理源 authKey 的内存与 SQLite，避免临时 key 残留
+    this.store.delete(fromAuthKey);
+
+    return ok;
   }
 
   /**

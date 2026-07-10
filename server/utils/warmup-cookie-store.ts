@@ -35,6 +35,12 @@ export async function warmupCookieStore(): Promise<void> {
 
       if (data && data.token) {
         const accountCookie = AccountCookie.create(data.token, data.cookies || []);
+        // 跳过已过期的 session：把过期 cookie 灌进内存，
+        // 会因「内存优先」覆盖后续从 SQLite 读取的新 cookie，导致 session 过期问题。
+        if (accountCookie.isExpired) {
+          console.log(`[CookieStore] 预热跳过已过期的 cookie: ${authKey}`);
+          continue;
+        }
         cookieStore.store.set(authKey, accountCookie);
       }
     }

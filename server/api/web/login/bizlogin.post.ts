@@ -1,9 +1,9 @@
 import dayjs from 'dayjs';
 import { randomUUID } from 'uncrypto';
 import { request } from '#shared/utils/request';
-import { getMpCookie, setMpCookie } from '~/server/database/cookie';
+import { deleteCookie as deleteMpCookie } from '~/server/database/cookie';
 import { createUser, getUserByUsername, updateUserToken } from '~/server/database/user';
-import { getCookieFromResponse, getCookiesFromRequest } from '~/server/utils/CookieStore';
+import { cookieStore, getCookieFromResponse, getCookiesFromRequest } from '~/server/utils/CookieStore';
 import { proxyMpRequest } from '~/server/utils/proxy-request';
 
 export default defineEventHandler(async event => {
@@ -77,11 +77,12 @@ export default defineEventHandler(async event => {
   const userToken = user.token;
 
   // 将微信 cookie 从临时 auth-key 迁移到用户的固定 token
-  const tempCookieData = await getMpCookie(tempAuthKey);
-  if (tempCookieData) {
-    await setMpCookie(userToken, tempCookieData);
-    // 清理临时 auth-key 的数据（可选）
-    // await deleteMpCookie(tempAuthKey);
+  // 关键：必须同时更新内存缓存（cookieStore）和 SQLite，否则「内存优先」会读到旧 cookie，
+  // 导致重新扫码后同步仍提示 session 过期。
+  const migrated = await cookieStore.migrateCookie(tempAuthKey, userToken);
+  if (migrated) {
+    // 清理 SQLite 中临时 auth-key 的记录（migrateCookie 已清内存）
+    await deleteMpCookie(tempAuthKey);
   }
 
   // 设置 auth-key cookie（使用用户的固定 token）
