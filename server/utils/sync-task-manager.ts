@@ -194,6 +194,7 @@ async function runSyncLoop(
   let totalCount = 0;
   let hasMore = true;
   let noNewStreak = 0; // 连续无新增文章的页数（增量同步停止条件）
+  let consecutiveErrors = 0; // 连续出错次数（超时/网络异常等），超过阈值则终止任务避免卡死队列
 
   // 从 CookieStore 获取 token 和 cookie（用 authKey，不依赖 event）
   const token = await cookieStore.getToken(authKey);
@@ -235,6 +236,9 @@ async function runSyncLoop(
           Origin: 'https://mp.weixin.qq.com',
           cookie: cookie || '',
         },
+        // 超时保护：微信接口偶尔会挂起不响应，不加超时会导致整个任务永久卡死，
+        // 串行队列里后续任务全部饿死（曾出现某公众号卡 16 分钟、后面 8 个公众号全显示"同步中"）。
+        signal: AbortSignal.timeout(30_000),
       });
       const wxData = await resp.json();
 
@@ -309,7 +313,9 @@ async function runSyncLoop(
 
       // 增量同步停止条件：连续 2 页都没有新增文章，说明已翻到旧的（全部已存在），停止。
       // 仅在 incremental=true（增量同步）时启用；全量同步不受此限制，必须翻完。
-      if (incremental && newCount === 0 && articles.length > 0) {
+      // 注意：空页（articles.length === 0）也算"无新增"，否则遇到空页会导致 noNewStreak 被重置、
+      // 永不停止（曾导致大公众号在全量模式下狂翻页卡住整个队列）。
+      if (incremental && newCount === 0) {
         noNewStreak++;
         if (noNewStreak >= 2) {
           task.message = `增量同步完成：已无新文章（共 ${totalSynced} 篇）`;
@@ -347,15 +353,32 @@ async function runSyncLoop(
         `[sync-task ${taskId}] 第 ${page + 1} 页完成，已同步 ${totalSynced} 篇，hasMore=${hasMore}`,
       );
 
+      consecutiveErrors = 0; // 成功完成一页，重置错误计数
+
       // 间隔防限流
       if (hasMore) {
         await sleep(intervalSeconds * 1000);
       }
-    } catch (e) {
-      console.error(`[sync-task ${taskId}] 第 ${page + 1} 页异常:`, e);
-      task.message = `第 ${page + 1} 页出错，继续重试...`;
+    } catch (e: any) {
+      consecutiveErrors++;
+      const isTimeout = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+      console.error(`[sync-task ${taskId}] 第 ${page + 1} 页异常（连续第 ${consecutiveErrors} 次${isTimeout ? '，超时' : ''}）:`, e?.message || e);
+
+      // 连续 3 次出错（典型如微信挂起超时），终止任务，避免卡死整个串行队列。
+      if (consecutiveErrors >= 3) {
+        task.status = 'failed';
+        task.error = isTimeout ? '请求连续超时' : '连续出错';
+        task.message = `第 ${page + 1} 页连续 ${consecutiveErrors} 次失败，终止（已同步 ${totalSynced} 篇）`;
+        task.synced = totalSynced;
+        task.finishedAt = Date.now();
+        task.updatedAt = Date.now();
+        console.error(`[sync-task ${taskId}] 连续 ${consecutiveErrors} 次出错，终止任务`);
+        return;
+      }
+
+      task.message = `第 ${page + 1} 页出错（第 ${consecutiveErrors} 次重试中）`;
       task.updatedAt = Date.now();
-      // 单页出错不中断，等一个间隔后继续
+      // 单页出错不立即中断，等一个间隔后重试
       await sleep(intervalSeconds * 1000);
     }
   }

@@ -118,8 +118,11 @@ async function runAutoSync() {
       nickname: account.nickname,
       authKey,
       begin: 0,
-      maxPages: 50,
+      // 定时同步走增量模式：连续无新增即停，避免大公众号狂翻页卡住队列。
+      // maxPages 作为硬上限保护（正常增量 1-2 页就停了）。
+      maxPages: 10,
       intervalSeconds: SYNC_INTERVAL_SECONDS,
+      incremental: true,
     });
     triggered++;
   }
