@@ -12,6 +12,9 @@
         <GlobalActions />
       </div>
 
+      <!-- session 过期提醒（仅过期时渲染，否则无高度） -->
+      <SessionExpiredBanner />
+
       <!-- 页面容器 -->
       <div class="flex-1 overflow-hidden">
         <NuxtPage />
@@ -22,5 +25,6 @@
 
 <script setup lang="ts">
 import GlobalActions from '~/components/dashboard/Actions.vue';
+import SessionExpiredBanner from '~/components/dashboard/SessionExpiredBanner.vue';
 import SideBar from '~/components/dashboard/SideBar.vue';
 </script>

@@ -98,6 +98,9 @@
 	// 正在运行的后台任务（fakeid -> taskId）
 	const activeSyncTasks = ref<Map<string, string>>(new Map());
 
+	// 每个任务的服务端状态（fakeid -> 'pending' | 'running'），用于 UI 区分排队/同步中
+	const taskStatusMap = ref<Map<string, 'pending' | 'running'>>(new Map());
+
 	// 所有正在同步/排队的公众号 fakeid 集合（用于批量显示同步状态）
 	const syncingFakeids = computed(() => new Set(activeSyncTasks.value.keys()));
 
@@ -144,10 +147,11 @@
 	      return;
 	    }
 
-	    // 记录任务，开始轮询
-	    activeSyncTasks.value.set(account.fakeid, result.taskId);
-	    syncingRowId.value = account.fakeid;
-	    isSyncing.value = true;
+		// 记录任务，开始轮询
+		activeSyncTasks.value.set(account.fakeid, result.taskId);
+		taskStatusMap.value.set(account.fakeid, 'pending');
+		syncingRowId.value = account.fakeid;
+		isSyncing.value = true;
 
 	    startPolling();
 	  } catch (e: any) {
@@ -168,30 +172,42 @@
 	      return;
 	    }
 
-	    // 查询所有活跃任务状态
-	    const taskIds = Array.from(activeSyncTasks.value.values());
-	    for (const taskId of taskIds) {
-	      try {
-	        const task = await accountApi.getSyncStatus(taskId);
-	        const fakeid = task.fakeid;
+		// 查询所有活跃任务状态
+		const taskIds = Array.from(activeSyncTasks.value.values());
+		for (const taskId of taskIds) {
+		  try {
+			const task = await accountApi.getSyncStatus(taskId);
+			const fakeid = task.fakeid;
 
-	        if (task.status === 'completed' || task.status === 'failed') {
-	          activeSyncTasks.value.delete(fakeid);
-	          await updateRow(fakeid);
+			if (task.status === 'completed' || task.status === 'failed') {
+			  activeSyncTasks.value.delete(fakeid);
+			  taskStatusMap.value.delete(fakeid);
+			  await updateRow(fakeid);
 
-	          if (task.status === 'failed') {
-	            if (task.error === 'session expired') {
-	              modal.open(LoginModal);
-	            }
-	            toast.error('同步失败', `${task.nickname}: ${task.message}`);
-	          } else {
-	            toast.success('同步完成', task.message);
-	          }
-	        }
-	      } catch (e) {
-	        console.warn('查询同步状态失败:', e);
-	      }
-	    }
+			  if (task.status === 'failed') {
+				if (task.error === 'session expired') {
+				  modal.open(LoginModal);
+				}
+				toast.error('同步失败', `${task.nickname}: ${task.message}`);
+			  } else {
+				// 取消导致的完成（非用户主动期望的"同步成功"），用 info 而非 success
+				if (task.message?.includes('手动停止') || task.message?.includes('未开始')) {
+				  toast.info('已停止', `${task.nickname}: ${task.message}`);
+				} else {
+				  toast.success('同步完成', task.message);
+				}
+			  }
+			} else if (task.status === 'running' || task.status === 'pending') {
+			  // 更新状态映射，让 UI 区分排队/同步中
+			  taskStatusMap.value.set(fakeid, task.status);
+			  // 注意：同步过程中不调 updateRow。
+			  // 因为公众号表的 synced_count/total_count 只在任务跑完后才更新（runSyncLoop 末尾），
+			  // 同步中反复拉公众号数据拿到的永远是旧值，进度条不会动。
+			}
+		  } catch (e) {
+			console.warn('查询同步状态失败:', e);
+		  }
+		}
 
 	    // 所有任务完成
 	    if (activeSyncTasks.value.size === 0) {
@@ -212,14 +228,57 @@
 	}
 
 	/**
-	 * 取消同步（前端停止轮询，服务端任务继续跑完当前页后自然结束）
+	 * 取消单个公众号的同步任务。
+	 *
+	 * 只通知服务端取消该行的 taskId，不停止全局轮询——
+	 * 轮询会继续跑，直到服务端确认任务变为 completed 后自动清除该行。
+	 * 这样 UI 能正确反映"正在停止 → 已停止"的状态变化。
+	 *
+	 * 协作式取消：服务端 runSyncLoop 在下一页循环检查 canceled 标志后退出，
+	 * 当前正在请求的那一页会跑完（最多等一个超时周期），然后停止。
+	 *
+	 * @param fakeid 要取消的公众号 ID（不传则取消全部）
 	 */
-	function cancelSync() {
-	  stopPolling();
-	  activeSyncTasks.value.clear();
-	  syncingRowId.value = null;
-	  isSyncing.value = false;
-	  isCanceled.value = false;
+	async function cancelSync(fakeid?: string) {
+		// 确定要取消的 taskId 列表
+		const taskIdsToCancel: string[] = [];
+		if (fakeid) {
+			// 单行取消：只取消该公众号的任务
+			const taskId = activeSyncTasks.value.get(fakeid);
+			if (taskId) taskIdsToCancel.push(taskId);
+			// 前端立即标记为"停止中"，让 UI 反馈
+			taskStatusMap.value.set(fakeid, 'pending');
+		} else {
+			// 全部取消（保留兼容）
+			isCanceled.value = true;
+			taskIdsToCancel.push(...Array.from(activeSyncTasks.value.values()));
+		}
+
+		// 通知服务端取消
+		await Promise.all(
+			taskIdsToCancel.map(taskId =>
+				$fetch('/api/web/data/v1/batch/sync-cancel', {
+					method: 'POST',
+					body: { taskId },
+				}).catch(() => {
+					// 单个取消失败不影响其他
+				}),
+			),
+		);
+
+		// 单行取消：不停止轮询，继续轮询等服务端确认取消完成
+		if (fakeid) {
+			toast.info('正在停止', '当前页完成后即停止');
+			return;
+		}
+
+		// 全部取消：清前端状态
+		stopPolling();
+		activeSyncTasks.value.clear();
+		taskStatusMap.value.clear();
+		syncingRowId.value = null;
+		isSyncing.value = false;
+		toast.info('已停止', '所有同步任务正在停止中');
 	}
 
 	// 同步单个公众号（增量：从最新文章开始，翻到无新文章为止）
@@ -238,6 +297,8 @@
 	  const rows = getSelectedRows();
 
 	  for (const account of rows) {
+	    // 用户点了停止则不再启动后续公众号
+	    if (isCanceled.value) break;
 	    // 增量：begin=0 从最新开始翻，连续两页无新增就停
 	    await startBackgroundSync(account, {
 	      begin: 0,
@@ -257,6 +318,8 @@
 	  const rows = getSelectedRows();
 
 	  for (const account of rows) {
+	    // 用户点了停止则不再启动后续公众号
+	    if (isCanceled.value) break;
 	    await startBackgroundSync(account, {
 	      begin: 0,
 	      deadline: deadline > 0 ? deadline : undefined,
@@ -417,13 +480,14 @@
 	        loadAccountArticle(params.data);
 	      },
 	      onStop: (params: ICellRendererParams) => {
-	        // 前端停止轮询（服务端任务跑完当前页后自然结束）
-	        cancelSync();
+	        // 单行取消：只停这一行的同步任务，不影响其他
+	        cancelSync(params.data.fakeid);
 	      },
 	      isDeleting: isDeleting,
 	      isSyncing: isSyncing,
 	      syncingRowId: syncingRowId,
 	      syncingFakeids: syncingFakeids,
+	      taskStatusMap: taskStatusMap,
 	    },
 	    cellClass: 'flex justify-center items-center',
 	    maxWidth: 100,
@@ -455,22 +519,23 @@
 	 */
 	async function restoreActiveSyncTasks() {
 	  try {
-	    const result = await accountApi.getSyncStatus();
-	    const tasks = result.tasks || [];
-	    const running = tasks.filter((t: any) => t.status === 'running' || t.status === 'pending');
+		const result = await accountApi.getSyncStatus();
+		const tasks = result.tasks || [];
+		const running = tasks.filter((t: any) => t.status === 'running' || t.status === 'pending');
 
-	    if (running.length > 0) {
-	      // 恢复任务映射
-	      for (const t of running) {
-	        activeSyncTasks.value.set(t.fakeid, t.id);
-	      }
-	      isSyncing.value = true;
-	      syncingRowId.value = running[0].fakeid;
-	      console.log(`[restore] 恢复了 ${running.length} 个正在运行的同步任务`);
-	      startPolling();
-	    }
+		if (running.length > 0) {
+		  // 恢复任务映射 + 状态映射
+		  for (const t of running) {
+			activeSyncTasks.value.set(t.fakeid, t.id);
+			taskStatusMap.value.set(t.fakeid, t.status);
+		  }
+		  isSyncing.value = true;
+		  syncingRowId.value = running[0].fakeid;
+		  console.log(`[restore] 恢复了 ${running.length} 个正在运行的同步任务`);
+		  startPolling();
+		}
 	  } catch (e) {
-	    // 静默失败
+		// 静默失败
 	  }
 	}
 

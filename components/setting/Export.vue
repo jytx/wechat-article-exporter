@@ -1,5 +1,5 @@
 <template>
-  <UCard class="mx-4 mt-10 flex-1">
+  <UCard>
     <template #header>
       <h3 class="text-2xl font-semibold">导出选项</h3>
       <p class="text-sm text-slate-10 font-serif">配置文章的导出选项</p>
@@ -51,6 +51,27 @@
           <span class="mr-1">预览:</span>
           <span class="font-mono text-gray-700 dark:text-gray-300">{{ dirnamePreview }}</span>
         </p>
+      </div>
+
+      <div>
+        <p class="mb-2 flex items-center gap-3">
+          <span>导出路径:</span>
+          <span class="text-xs text-gray-500">(服务端文件系统路径，所有导出文件将保存到此目录)</span>
+          <UPopover mode="hover" :popper="{ placement: 'top' }">
+            <template #panel>
+              <p class="max-w-[300px] p-3 text-sm text-gray-500">
+                设置导出文件的服务端保存路径。例如：<code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">./exports</code> 或 <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">/home/user/downloads</code>。<br />
+                路径相对于项目根目录或使用绝对路径。确保服务端有该目录的写入权限。
+              </p>
+            </template>
+            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
+          </UPopover>
+        </p>
+        <UInput
+          placeholder="导出路径"
+          v-model="preferences.exportConfig.exportPath"
+          class="w-[600px] font-mono"
+        />
       </div>
       <div>
         <p class="mb-2 flex items-center gap-3">

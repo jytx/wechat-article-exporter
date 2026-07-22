@@ -13,6 +13,7 @@ import { getDatabase } from '~/server/utils/database';
 import { getAllSettings, getSetting, setSetting } from '~/server/database/settings';
 import { getAllAccounts } from '~/server/database/account';
 import { startSyncTask, getActiveTasks } from '~/server/utils/sync-task-manager';
+import { cookieStore } from '~/server/utils/CookieStore';
 
 let currentJob: cron.ScheduledTask | null = null;
 
@@ -83,6 +84,59 @@ function getLatestAuthKey(): string | null {
   }
 }
 
+/** settings 表中记录 session 过期时间戳的 key（空值表示未过期） */
+export const SESSION_EXPIRED_KEY = 'mp_session_expired_at';
+
+/**
+ * 轻量预检：用最新 authKey 请求一次微信接口，判断 session 是否有效。
+ * 纯函数 —— 只读不写副作用，由调用方决定如何持久化结果。
+ *
+ * @returns valid=true 表示 session 有效；valid=false 表示过期或无法验证
+ */
+async function checkSessionValid(authKey: string): Promise<{ valid: boolean; reason: string }> {
+  const token = await cookieStore.getToken(authKey);
+  const cookie = await cookieStore.getCookie(authKey);
+  if (!token || !cookie) {
+    return { valid: false, reason: '无有效 token/cookie' };
+  }
+
+  try {
+    const urlParams = new URLSearchParams({
+      sub: 'list',
+      search_field: 'null',
+      begin: '0',
+      count: '1',
+      fakeid: '',
+      type: '101_1',
+      free_publish_type: '1',
+      sub_action: 'list_ex',
+      token,
+      lang: 'zh_CN',
+      f: 'json',
+      ajax: '1',
+    });
+    const resp = await fetch(`https://mp.weixin.qq.com/cgi-bin/appmsgpublish?${urlParams}`, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Referer: 'https://mp.weixin.qq.com/',
+        cookie: cookie || '',
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const data: any = await resp.json();
+    // ret=200003 是微信的 session 过期码
+    if (data?.base_resp?.ret === 200003) {
+      return { valid: false, reason: '微信返回 session 过期（200003）' };
+    }
+    return { valid: true, reason: '' };
+  } catch (e: any) {
+    // 网络异常时不判定为过期，避免误报；让后续同步任务自己处理
+    console.warn('[auto-sync] session 预检网络异常，跳过预检:', e?.message || e);
+    return { valid: true, reason: '预检异常，按有效处理' };
+  }
+}
+
 /**
  * 执行一次全量自动同步
  */
@@ -94,8 +148,22 @@ async function runAutoSync() {
   const authKey = getLatestAuthKey();
   if (!authKey) {
     console.log('[auto-sync] 无有效登录态，跳过（请先扫码登录）');
+    setSetting(SESSION_EXPIRED_KEY, String(Math.floor(Date.now() / 1000)));
     return;
   }
+
+  // session 有效性预检：过期则记录标志、跳过所有公众号的无意义同步。
+  // 没有这一步时，10 个公众号会逐个请求微信 → 全部返回 200003，浪费请求且无提醒。
+  const { valid, reason } = await checkSessionValid(authKey);
+  if (!valid) {
+    const ts = Math.floor(Date.now() / 1000);
+    setSetting(SESSION_EXPIRED_KEY, String(ts));
+    console.warn(`[auto-sync] session 已过期（${reason}），定时同步暂停。请重新扫码登录。`);
+    return;
+  }
+
+  // session 有效，清除过期标志（可能是重新登录后首次定时触发）
+  setSetting(SESSION_EXPIRED_KEY, '');
 
   const accounts = await getAllAccounts();
   if (accounts.length === 0) {

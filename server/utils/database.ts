@@ -139,52 +139,7 @@ function initializeSchema(database: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_metrics_article_time ON article_metrics(article_create_time);
   `);
 
-  // 创建 AI 选题表（AI 生成的选题建议，一次生成共享一个 batch_id）
-  // 注：列名用 ref_articles 而非 references，后者是 SQL 保留字
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS ai_topics (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      batch_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      angle TEXT,
-      summary TEXT,
-      keywords TEXT,
-      ref_articles TEXT,
-      provider TEXT,
-      created_at INTEGER DEFAULT (strftime('%s', 'now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_ai_topics_batch ON ai_topics(batch_id);
-    CREATE INDEX IF NOT EXISTS idx_ai_topics_created ON ai_topics(created_at DESC);
-  `);
-
-  // AI 选题「分析过程」记录表（一次 batch 对应一次 AI 分析）
-  // 存输入 prompt、原始返回、耗时、token、重试次数等，供前端查看分析过程
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS ai_topic_runs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      batch_id TEXT NOT NULL,
-      provider TEXT,
-      model TEXT,
-      status TEXT NOT NULL,
-      error TEXT,
-      system_prompt TEXT,
-      user_message TEXT,
-      raw_response TEXT,
-      suggestion_count INTEGER DEFAULT 0,
-      input_article_count INTEGER DEFAULT 0,
-      duration_ms INTEGER,
-      prompt_tokens INTEGER,
-      completion_tokens INTEGER,
-      attempts INTEGER DEFAULT 1,
-      created_at INTEGER DEFAULT (strftime('%s', 'now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_ai_topic_runs_batch ON ai_topic_runs(batch_id);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_topic_runs_batch_unique ON ai_topic_runs(batch_id);
-  `);
-
-  // 文章纯文本正文表（cheerio 从原始 HTML 提取，给 AI 读取用，~5KB/篇）
+  // 文章纯文本正文表（cheerio 从原始 HTML 提取，给 AI/日报/MCP 读取用，~5KB/篇）
   // 与 article_html（原始HTML，给导出用）并存，互不干扰
   database.exec(`
     CREATE TABLE IF NOT EXISTS article_content (

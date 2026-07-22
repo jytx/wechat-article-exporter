@@ -40,40 +40,6 @@ const DEFAULT_SETTINGS: SettingItem[] = [
       metadataOverrideContent: false,
     }),
   },
-  // —— AI 自动选题相关配置 ——
-  {
-    key: 'ai_config',
-    value: JSON.stringify({
-      provider: 'deepseek',
-      apiKey: '',
-      baseUrl: 'https://api.deepseek.com/v1',
-      model: 'deepseek-chat',
-      suggestionCount: 5,
-      systemPrompt: '',
-      articleDays: 7,
-      articleLimit: 10,
-    }),
-  },
-  {
-    key: 'email_config',
-    value: JSON.stringify({
-      enabled: false,
-      smtpHost: '',
-      smtpPort: 465,
-      smtpSecure: true,
-      smtpUser: '',
-      smtpPass: '',
-      from: '',
-      to: [],
-    }),
-  },
-  {
-    key: 'topic_schedule',
-    value: JSON.stringify({
-      enabled: false,
-      cron: '0 9 * * *',
-    }),
-  },
   // —— 文章自动同步调度 ——
   {
     key: 'article_sync_schedule',

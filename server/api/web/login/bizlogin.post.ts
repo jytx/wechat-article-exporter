@@ -5,6 +5,8 @@ import { deleteCookie as deleteMpCookie } from '~/server/database/cookie';
 import { createUser, getUserByUsername, updateUserToken } from '~/server/database/user';
 import { cookieStore, getCookieFromResponse, getCookiesFromRequest } from '~/server/utils/CookieStore';
 import { proxyMpRequest } from '~/server/utils/proxy-request';
+import { setSetting } from '~/server/database/settings';
+import { SESSION_EXPIRED_KEY } from '~/server/plugins/metrics-scheduler';
 
 export default defineEventHandler(async event => {
   const cookie = getCookiesFromRequest(event);
@@ -83,6 +85,8 @@ export default defineEventHandler(async event => {
   if (migrated) {
     // 清理 SQLite 中临时 auth-key 的记录（migrateCookie 已清内存）
     await deleteMpCookie(tempAuthKey);
+    // 重新登录成功，清除 session 过期标志（前端 banner 据此消失）
+    setSetting(SESSION_EXPIRED_KEY, '');
   }
 
   // 设置 auth-key cookie（使用用户的固定 token）

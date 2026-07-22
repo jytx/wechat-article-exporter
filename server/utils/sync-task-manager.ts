@@ -25,6 +25,8 @@ export interface SyncTask {
   maxPages: number;
   message: string;
   error?: string;
+  /** 用户手动取消标志：runSyncLoop 每页循环检查此字段，为 true 则停止 */
+  canceled?: boolean;
   startedAt: number;
   updatedAt: number;
   finishedAt?: number;
@@ -62,6 +64,26 @@ export function getActiveTasks(): SyncTask[] {
 export function getAllTasks(): SyncTask[] {
   cleanupOldTasks();
   return Array.from(tasks.values()).sort((a, b) => b.startedAt - a.startedAt);
+}
+
+/**
+ * 取消一个同步任务（协作式取消）。
+ *
+ * 只设置 canceled 标志，不强制中断当前正在执行的微信请求。
+ * runSyncLoop 在每页循环开头检查此标志，pending 任务在出队时检查。
+ * 这样既能响应用户的停止操作，又不会因 abort 微信请求而触发风控。
+ *
+ * @returns true=任务存在且已标记取消；false=任务不存在或已完成
+ */
+export function cancelTask(taskId: string): boolean {
+  const task = tasks.get(taskId);
+  if (!task) return false;
+  // 已结束的任务无需再取消
+  if (task.status === 'completed' || task.status === 'failed') return false;
+  task.canceled = true;
+  task.updatedAt = Date.now();
+  console.log(`[sync-task ${taskId}] 收到取消请求（当前状态: ${task.status}）`);
+  return true;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -159,8 +181,17 @@ export function startSyncTask(params: {
 
   // 加入串行队列，fire-and-forget
   void enqueueTask(async () => {
-    // 任务开始执行时，状态从 pending 改为 running
     const t = tasks.get(taskId);
+    // pending 阶段就被取消了（排在队列里还没轮到执行）：直接标记完成，不进 runSyncLoop
+    if (t?.canceled) {
+      t.status = 'completed';
+      t.message = '已手动停止（任务未开始）';
+      t.finishedAt = Date.now();
+      t.updatedAt = Date.now();
+      console.log(`[sync-task ${taskId}] 任务在排队阶段被取消，跳过执行`);
+      return;
+    }
+    // 任务开始执行时，状态从 pending 改为 running
     if (t && t.status === 'pending') {
       t.status = 'running';
       t.message = '开始同步...';
@@ -212,6 +243,17 @@ async function runSyncLoop(
   console.log(`[sync-task ${taskId}] 开始同步 ${fakeid}，begin=${begin}，incremental=${incremental}，maxPages=${maxPages}`);
 
   for (let page = 0; page < maxPages && hasMore; page++) {
+    // 用户手动取消：每页循环开头检查，在发起下一次微信请求前退出
+    if (task.canceled) {
+      task.status = 'completed';
+      task.message = `已手动停止（本次同步 ${totalSynced} 篇）`;
+      task.synced = totalSynced;
+      task.finishedAt = Date.now();
+      task.updatedAt = Date.now();
+      console.log(`[sync-task ${taskId}] 用户已取消，停止同步（已同步 ${totalSynced} 篇）`);
+      return;
+    }
+
     try {
       const urlParams = new URLSearchParams({
         sub: 'list',
