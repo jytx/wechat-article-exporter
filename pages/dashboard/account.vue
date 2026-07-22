@@ -13,6 +13,7 @@
 	import { defu } from 'defu';
 	import { formatTimeStamp } from '#shared/utils/helpers';
 	import GlobalSearchAccountDialog from '~/components/global/SearchAccountDialog.vue';
+	import BatchSearchAccounts from '~/components/dashboard/BatchSearchAccounts.vue';
 	import GridAccountActions from '~/components/grid/AccountActions.vue';
 	import GridLoadProgress from '~/components/grid/LoadProgress.vue';
 	import ConfirmModal from '~/components/modal/Confirm.vue';
@@ -98,8 +99,9 @@
 	// 正在运行的后台任务（fakeid -> taskId）
 	const activeSyncTasks = ref<Map<string, string>>(new Map());
 
-	// 每个任务的服务端状态（fakeid -> 'pending' | 'running'），用于 UI 区分排队/同步中
-	const taskStatusMap = ref<Map<string, 'pending' | 'running'>>(new Map());
+	// 每个任务的服务端状态，用于 UI 区分排队/同步中/停止中
+	// canceling 是纯前端状态：用户点了停止但服务端还没确认完成
+	const taskStatusMap = ref<Map<string, 'pending' | 'running' | 'canceling'>>(new Map());
 
 	// 所有正在同步/排队的公众号 fakeid 集合（用于批量显示同步状态）
 	const syncingFakeids = computed(() => new Set(activeSyncTasks.value.keys()));
@@ -122,30 +124,37 @@
 	  options: { begin?: number; deadline?: number; maxPages?: number; incremental?: boolean } = {},
 	): Promise<void> {
 	  if (activeSyncTasks.value.has(account.fakeid)) {
-	    toast.info('提示', `${account.nickname} 正在同步中`);
-	    return;
+		toast.info('提示', `${account.nickname} 正在同步中`);
+		return;
 	  }
 
 	  const intervalSeconds = (preferences.value as unknown as Preferences).accountSyncSeconds || 5;
 
 	  try {
-	    const result = await accountApi.syncAccount(account.fakeid, {
-	      ...options,
-	      intervalSeconds,
-	    });
+		console.log(`[sync] 启动 ${account.nickname} 的同步任务...`);
+		const result = await accountApi.syncAccount(account.fakeid, {
+		  ...options,
+		  intervalSeconds,
+		});
+		console.log(`[sync] ${account.nickname} 返回:`, JSON.stringify(result));
 
-	    if (result.error) {
-	      if (result.error === 'session expired' || result.error === '未登录或登录已过期') {
-	        modal.open(LoginModal);
-	      }
-	      toast.error('同步失败', result.error);
-	      return;
-	    }
+		if (result.error) {
+		  if (result.error === 'session expired' || result.error === '未登录或登录已过期') {
+			modal.open(LoginModal);
+		  }
+		  toast.error('同步失败', result.error);
+		  return;
+		}
 
-	    if (result.alreadyRunning) {
-	      toast.info('提示', `${account.nickname} 正在同步中`);
-	      return;
-	    }
+		if (result.alreadyRunning) {
+		  toast.info('提示', `${account.nickname} 正在同步中`);
+		  return;
+		}
+
+		if (!result.taskId) {
+		  toast.error('同步失败', '未获取到任务ID');
+		  return;
+		}
 
 		// 记录任务，开始轮询
 		activeSyncTasks.value.set(account.fakeid, result.taskId);
@@ -153,10 +162,10 @@
 		syncingRowId.value = account.fakeid;
 		isSyncing.value = true;
 
-	    startPolling();
+		startPolling();
 	  } catch (e: any) {
-	    console.error('启动同步失败:', e);
-	    toast.error('同步失败', e?.message || '启动同步失败');
+		console.error('启动同步失败:', e);
+		toast.error('同步失败', e?.message || '启动同步失败');
 	  }
 	}
 
@@ -178,6 +187,7 @@
 		  try {
 			const task = await accountApi.getSyncStatus(taskId);
 			const fakeid = task.fakeid;
+			console.log(`[poll] ${task.nickname}: status=${task.status} pages=${task.pagesDone} synced=${task.synced}`);
 
 			if (task.status === 'completed' || task.status === 'failed') {
 			  activeSyncTasks.value.delete(fakeid);
@@ -198,11 +208,11 @@
 				}
 			  }
 			} else if (task.status === 'running' || task.status === 'pending') {
-			  // 更新状态映射，让 UI 区分排队/同步中
-			  taskStatusMap.value.set(fakeid, task.status);
-			  // 注意：同步过程中不调 updateRow。
-			  // 因为公众号表的 synced_count/total_count 只在任务跑完后才更新（runSyncLoop 末尾），
-			  // 同步中反复拉公众号数据拿到的永远是旧值，进度条不会动。
+			  // 更新状态映射，但不要覆盖 canceling（用户已点停止，等服务端确认 completed）
+			  const current = taskStatusMap.value.get(fakeid);
+			  if (current !== 'canceling') {
+			    taskStatusMap.value.set(fakeid, task.status);
+			  }
 			}
 		  } catch (e) {
 			console.warn('查询同步状态失败:', e);
@@ -246,8 +256,8 @@
 			// 单行取消：只取消该公众号的任务
 			const taskId = activeSyncTasks.value.get(fakeid);
 			if (taskId) taskIdsToCancel.push(taskId);
-			// 前端立即标记为"停止中"，让 UI 反馈
-			taskStatusMap.value.set(fakeid, 'pending');
+			// 前端立即标记为"停止中"，防止轮询把状态覆盖回 running
+			taskStatusMap.value.set(fakeid, 'canceling');
 		} else {
 			// 全部取消（保留兼容）
 			isCanceled.value = true;
@@ -295,10 +305,16 @@
 
 	  const deadline = syncToTimestamp;
 	  const rows = getSelectedRows();
+	  console.log(`[batch-sync] 开始批量同步 ${rows.length} 个公众号`);
 
-	  for (const account of rows) {
+	  for (let i = 0; i < rows.length; i++) {
+	    const account = rows[i];
 	    // 用户点了停止则不再启动后续公众号
-	    if (isCanceled.value) break;
+	    if (isCanceled.value) {
+	      console.log(`[batch-sync] 已取消，跳过 ${account.nickname}（第 ${i + 1}/${rows.length} 个）`);
+	      break;
+	    }
+	    console.log(`[batch-sync] 启动第 ${i + 1}/${rows.length} 个: ${account.nickname}`);
 	    // 增量：begin=0 从最新开始翻，连续两页无新增就停
 	    await startBackgroundSync(account, {
 	      begin: 0,
@@ -307,6 +323,7 @@
 	      incremental: true,
 	    });
 	  }
+	  console.log(`[batch-sync] 批量同步循环结束，共启动 ${activeSyncTasks.value.size} 个任务`);
 	}
 
 	// 重新同步（全量：强制从头 begin=0 开始）

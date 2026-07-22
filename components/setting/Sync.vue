@@ -13,9 +13,8 @@
           <UPopover mode="hover" :popper="{ placement: 'top' }">
             <template #panel>
               <p class="max-w-[300px] p-3 text-sm text-gray-500">
-                在同步公众号文章数据时，程序会自动抓取该公众号的所有文章，直到所有数据同步完成。<br />
-                该选项用于控制抓取频率，比如设置为 5
-                就表示每五秒抓取一次。该数据越小，同步的越快，但是容易被封号。推荐不小于3
+                每翻一页文章列表后的等待秒数，用于防止请求过快被微信限流。<br />
+                推荐范围 3-10 秒。小于 3 秒容易触发风控，大于 10 秒会导致多公众号批量同步非常慢。
               </p>
             </template>
             <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
@@ -24,13 +23,16 @@
         <UInput
           type="number"
           v-model="preferences.accountSyncSeconds"
-          placeholder="配置同步频率"
+          placeholder="3-10"
           class="w-52 font-mono"
+          :min="1"
+          :max="60"
         >
           <template #trailing>
             <span class="text-gray-500 dark:text-gray-400 text-xs">秒</span>
           </template>
         </UInput>
+        <p v-if="syncSecondsWarning" class="mt-1 text-xs text-orange-500">{{ syncSecondsWarning }}</p>
       </div>
 
       <!-- 同步时间范围 -->
@@ -128,6 +130,15 @@ const DURATION_OPTIONS = getSelectOptions();
 function formatDate() {
   return dayjs.unix(preferences.value.syncDatePoint).format('YYYY-MM-DD');
 }
+
+/** 同步频率异常值警告（纯函数，不修改入参） */
+const syncSecondsWarning = computed<string>(() => {
+  const v = preferences.value.accountSyncSeconds;
+  if (!v || v < 1) return '同步频率必须大于 0';
+  if (v < 3) return '小于 3 秒容易触发微信风控，建议增大';
+  if (v > 10) return `当前 ${v} 秒/页，批量同步多个公众号时会非常慢（如 5 页 × 10 个 = ${(v * 5 * 10 / 60).toFixed(0)} 分钟）`;
+  return '';
+});
 
 // ========== 自动同步配置 ==========
 const syncSchedule = reactive({
