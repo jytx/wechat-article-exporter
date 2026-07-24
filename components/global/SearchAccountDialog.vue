@@ -1,7 +1,10 @@
 <template>
-  <ElDrawer v-model="isOpen" direction="ltr">
+  <ElDrawer v-model="isOpen" direction="ltr" size="400px">
+    <template #header>
+      <h3 class="text-lg font-semibold">添加公众号</h3>
+    </template>
     <div
-      class="rounded-lg divide-y divide-gray-100 dark:divide-gray-800 shadow bg-white dark:bg-gray-900 flex flex-col flex-1 overflow-y-scroll"
+      class="flex flex-col h-full overflow-y-scroll"
     >
       <div class="sticky top-0 bg-white py-4 px-2 shadow">
         <SearchAccountForm ref="searchFormRef" v-model="accountQuery" @search="searchAccount" />

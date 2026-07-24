@@ -1,9 +1,12 @@
 <template>
   <!-- 搜索抽屉 -->
-  <ElDrawer v-model="isOpen" direction="ltr" size="384px">
+  <ElDrawer v-model="isOpen" direction="ltr" size="400px">
+    <template #header>
+      <h3 class="text-lg font-semibold">搜索文章</h3>
+    </template>
     <div
       ref="scrollContainerRef"
-      class="w-96 rounded-lg divide-y divide-gray-100 dark:divide-gray-800 shadow bg-white dark:bg-gray-900 flex flex-col flex-1 overflow-y-scroll"
+      class="flex flex-col h-full overflow-y-scroll"
       @scroll="onScroll"
     >
       <div class="sticky top-0 bg-white py-4 px-2 shadow dark:bg-gray-900 z-10">
