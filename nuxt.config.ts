@@ -6,6 +6,10 @@ export default defineNuxtConfig({
   },
   modules: ['@vueuse/nuxt', '@nuxt/icon', '@element-plus/nuxt', '@nuxtjs/tailwindcss', 'nuxt-monaco-editor', '@sentry/nuxt/module', 'nuxt-umami'],
   ssr: false,
+  // @nuxt/icon：将组件名注册为 UIcon，兼容原有 @nuxt/ui 的命名习惯（31 处 <UIcon> 无需改动）
+  icon: {
+    componentName: 'UIcon',
+  },
   runtimeConfig: {
     public: {
       aggridLicense: process.env.NUXT_AGGRID_LICENSE,

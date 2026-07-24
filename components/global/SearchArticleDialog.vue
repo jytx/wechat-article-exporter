@@ -110,7 +110,7 @@
 import { Loader } from 'lucide-vue-next';
 import SearchArticleForm from '~/components/global/SearchArticleForm.vue';
 
-const toast = useToast();
+const toast = toastFactory();
 
 const isOpen = ref(false);
 const searchFormRef = ref<InstanceType<typeof SearchArticleForm> | null>(null);
@@ -172,12 +172,7 @@ async function searchArticle() {
     }
   } catch (e: any) {
     console.error('搜索失败:', e);
-    toast.add({
-      color: 'rose',
-      title: '错误',
-      description: e.message || '搜索失败',
-      icon: 'i-octicon:bell-24',
-    });
+    toast.error('错误', e.message || '搜索失败');
   } finally {
     loading.value = false;
   }
@@ -220,12 +215,7 @@ async function loadData() {
     }
   } catch (e: any) {
     console.error('搜索失败:', e);
-    toast.add({
-      color: 'rose',
-      title: '错误',
-      description: e.message || '搜索失败',
-      icon: 'i-octicon:bell-24',
-    });
+    toast.error('错误', e.message || '搜索失败');
   } finally {
     loading.value = false;
   }

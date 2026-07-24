@@ -11,7 +11,7 @@
  */
 import { createSharedComposable } from '@vueuse/core';
 import type { Component, Ref } from 'vue';
-import { ref } from 'vue';
+import { ref, shallowRef } from 'vue';
 
 /** 弹窗扩展选项（对应 Nuxt UI Modal 类型的子集，透传给 ElDialog） */
 export interface DialogOptions {
@@ -49,7 +49,8 @@ export interface UseDialogReturn {
 }
 
 function _useDialog(): UseDialogReturn {
-  const state = ref<DialogState>({
+  // 用 shallowRef 避免组件对象被深度响应式化（Vue 会警告性能问题）
+  const state = shallowRef<DialogState>({
     component: null,
     props: {},
     options: {},

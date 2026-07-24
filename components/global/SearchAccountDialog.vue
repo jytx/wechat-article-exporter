@@ -53,7 +53,7 @@ import { ACCOUNT_LIST_PAGE_SIZE, ACCOUNT_TYPE } from '~/config';
 import SearchAccountForm from '~/components/global/SearchAccountForm.vue';
 import type { AccountInfo } from '~/types/types';
 
-const toast = useToast();
+const toast = toastFactory();
 const modal = useDialog();
 
 const isOpen = ref(false);
@@ -94,12 +94,7 @@ async function loadData() {
       modal.open(LoginModal);
     } else {
       console.error(e);
-      toast.add({
-        color: 'rose',
-        title: '错误',
-        description: e.message,
-        icon: 'i-octicon:bell-24',
-      });
+      toast.error('错误', e.message);
     }
   } finally {
     loading.value = false;

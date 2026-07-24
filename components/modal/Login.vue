@@ -133,14 +133,9 @@ async function bizLogin() {
     <!-- 头部 -->
     <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
       <h2 class="text-lg font-semibold">登录微信公众号</h2>
-      <UButton
-        square
-        variant="link"
-        color="gray"
-        icon="i-lucide:x"
-        class="absolute right-3 top-3"
-        @click="closeModal"
-      />
+      <ElButton text circle class="absolute right-3 top-3" @click="closeModal">
+        <UIcon name="i-lucide:x" class="size-5" />
+      </ElButton>
     </div>
 
     <!-- 二维码图片展示区 -->
