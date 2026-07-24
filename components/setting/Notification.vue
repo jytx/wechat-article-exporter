@@ -144,6 +144,16 @@ async function save() {
 }
 defineExpose({ save });
 
+// 自动保存：config 变化后防抖触发（复用已有的 save 方法）
+let _autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let _configLoaded = false;
+watch(config, () => {
+  // 跳过首次加载时的触发（loadConfig 赋值会触发 watch）
+  if (!_configLoaded) return;
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => save(), 800);
+}, { deep: true });
+
 // ========== 加载配置 ==========
 
 async function loadConfig() {
@@ -163,6 +173,9 @@ async function loadConfig() {
     }
   } catch {
     // 静默失败，使用默认值
+  } finally {
+    // 标记加载完成，之后 config 变化才触发自动保存
+    _configLoaded = true;
   }
 }
 

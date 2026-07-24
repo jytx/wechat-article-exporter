@@ -149,6 +149,15 @@ async function save() {
 }
 defineExpose({ save });
 
+// 自动保存：config 变化后防抖触发
+let _autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let _configLoaded = false;
+watch(config, () => {
+  if (!_configLoaded) return;
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => save(), 800);
+}, { deep: true });
+
 // ========== 加载配置 ==========
 
 /** 通知配置是否就绪（邮箱或 webhook 已启用 + articleDigest 事件已勾选） */
@@ -200,6 +209,8 @@ async function loadConfig() {
     }
   } catch {
     // 静默失败，使用默认值
+  } finally {
+    _configLoaded = true;
   }
 }
 

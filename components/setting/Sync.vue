@@ -165,6 +165,8 @@ async function loadSyncSchedule() {
     }
   } catch {
     // 静默失败
+  } finally {
+    _scheduleLoaded = true;
   }
 }
 
@@ -175,13 +177,21 @@ async function saveSyncSchedule() {
       method: 'PUT',
       body: { enabled: syncSchedule.enabled, cron: syncSchedule.cron },
     });
-    toast.success('保存成功', syncSchedule.enabled ? `自动同步已启用：${syncSchedule.cron}` : '自动同步已禁用');
   } catch (e: any) {
     toast.error('保存失败', e?.message || '配置保存失败');
   } finally {
     savingSchedule.value = false;
   }
 }
+
+// 自动保存：syncSchedule 变化后防抖触发（静默，不弹 toast）
+let _scheduleLoaded = false;
+let _scheduleSaveTimer: ReturnType<typeof setTimeout> | null = null;
+watch(syncSchedule, () => {
+  if (!_scheduleLoaded) return;
+  if (_scheduleSaveTimer) clearTimeout(_scheduleSaveTimer);
+  _scheduleSaveTimer = setTimeout(() => saveSyncSchedule(), 800);
+}, { deep: true });
 
 onMounted(() => {
   loadSyncSchedule();
