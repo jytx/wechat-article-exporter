@@ -1,17 +1,18 @@
 <template>
   <div>
-    <UButton icon="i-lucide:search" color="blue" variant="soft" @click="open = true">批量搜索</UButton>
+    <ElButton type="primary" plain @click="open = true"
+      ><template #icon><UIcon name="i-lucide:search" /></template>批量搜索</ElButton
+    >
 
-    <UModal v-model="open" :ui="{ width: 'max-w-[640px]' }">
-      <UCard class="flex flex-col max-h-[85vh]">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">批量搜索公众号</h3>
-            <UButton icon="i-lucide:x" color="gray" variant="ghost" size="xs" @click="open = false" />
-          </div>
-        </template>
+    <ElDialog v-model="open" width="640px">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold">批量搜索公众号</h3>
+          <ElButton text size="small" @click="open = false"><template #icon><UIcon name="i-lucide:x" /></template></ElButton>
+        </div>
+      </template>
 
-        <div class="flex flex-col gap-3">
+      <div class="flex flex-col max-h-[85vh] gap-3">
           <p class="text-sm text-gray-500">
             输入公众号名称或微信号，一行一个。每个间隔约 1.5 秒防限流，搜到的会自动入库。
           </p>
@@ -26,9 +27,11 @@
           ></textarea>
 
           <div class="flex items-center justify-between">
-            <UCheckbox v-model="autoSave" label="自动入库" :disabled="searching" />
+            <ElCheckbox v-model="autoSave" :disabled="searching">自动入库</ElCheckbox>
             <div class="flex gap-2">
-              <UButton v-if="!searching" color="indigo" icon="i-lucide:search" @click="startSearch">开始搜索</UButton>
+              <ElButton v-if="!searching" type="primary" @click="startSearch"
+                ><template #icon><UIcon name="i-lucide:search" /></template>开始搜索</ElButton
+              >
               <div v-else class="flex items-center gap-2 text-sm text-indigo-500">
                 <Loader2 class="size-4 animate-spin" />
                 <span>{{ task?.message || '搜索中...' }}</span>
@@ -38,7 +41,7 @@
 
           <!-- 进度条 -->
           <div v-if="task && searching" class="space-y-1">
-            <UProgress :value="task.done" :max="task.total || 1" />
+            <ElProgress :percentage="Math.round(task.done / (task.total || 1) * 100)" :show-text="false" :stroke-width="8" />
             <div class="text-xs text-gray-500 flex justify-between">
               <span>{{ task.done }}/{{ task.total }} · 找到 {{ task.found }} · 入库 {{ task.saved }}</span>
             </div>
@@ -68,9 +71,9 @@
                   </td>
                   <td class="p-2 text-gray-500 font-mono text-xs">{{ r.alias || '-' }}</td>
                   <td class="p-2 text-center">
-                    <UBadge v-if="r.found && r.matched" color="green" variant="subtle" size="xs">精确</UBadge>
-                    <UBadge v-else-if="r.found" color="amber" variant="subtle" size="xs">疑似</UBadge>
-                    <UBadge v-else color="gray" variant="subtle" size="xs">未找到</UBadge>
+                    <ElTag v-if="r.found && r.matched" type="success" effect="light" size="small">精确</ElTag>
+                    <ElTag v-else-if="r.found" type="warning" effect="light" size="small">疑似</ElTag>
+                    <ElTag v-else type="info" effect="light" size="small">未找到</ElTag>
                   </td>
                 </tr>
               </tbody>
@@ -85,8 +88,7 @@
             <span v-else class="text-rose-500">❌ {{ task.message }}</span>
           </div>
         </div>
-      </UCard>
-    </UModal>
+    </ElDialog>
   </div>
 </template>
 

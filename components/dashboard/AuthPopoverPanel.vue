@@ -58,13 +58,12 @@ const actions: Action[] = [
         <img :alt="user.username" :src="user.avatar" class="size-20 rounded-full" />
         <h2 class="flex items-center gap-1.5 pt-1 font-bold">
           <span>{{ user.name }}</span>
-          <UBadge
-            :ui="{ rounded: 'rounded-full' }"
-            :color="user.plan === 'pro' ? 'fuchsia' : 'gray'"
-            variant="subtle"
-            size="xs"
+          <ElTag
+            type="primary"
+            effect="light"
+            size="small"
             class="px-2 font-mono font-bold"
-            >{{ user.plan }}</UBadge
+            >{{ user.plan }}</ElTag
           >
         </h2>
         <div class="flex items-center gap-1.5">
@@ -73,11 +72,10 @@ const actions: Action[] = [
           <span>{{ user.username }}</span>
         </div>
         <div class="mt-3" v-if="user.plan === 'free'">
-          <!--          <UButton>订阅 Pro 会员</UButton>-->
-          <UButton
-            :ui="{ rounded: 'rounded-full', padding: { sm: 'px-5' } }"
+          <!--          <ElButton>订阅 Pro 会员</ElButton>-->
+          <ElButton
             class="flex gap-2 items-center rounded-full border-2 border-primary text-primary font-medium bg-white hover:bg-primary hover:text-white transition-colors px-5 py-1.5 text-sm"
-            >订阅 Pro 会员 (10元/月)</UButton
+            >订阅 Pro 会员 (10元/月)</ElButton
           >
         </div>
       </div>
@@ -99,10 +97,14 @@ const actions: Action[] = [
       <p class="font-serif">Log into with</p>
       <div class="space-y-3 my-3">
         <!-- GitHub -->
-        <UButton @click="loginWithGitHub" block color="white" size="xl" icon="i-logos:github-icon">GitHub</UButton>
+        <ElButton @click="loginWithGitHub" size="large" class="w-full"
+          ><template #icon><UIcon name="i-logos:github-icon" /></template>GitHub</ElButton
+        >
 
         <!-- Google -->
-        <UButton @click="loginWithGoogle" block color="white" size="xl" icon="i-logos:google-icon">Google</UButton>
+        <ElButton @click="loginWithGoogle" size="large" class="w-full"
+          ><template #icon><UIcon name="i-logos:google-icon" /></template>Google</ElButton
+        >
       </div>
     </div>
   </div>

@@ -36,21 +36,21 @@ const isCredentialActive = computed(() => credentialState.value === 'active');
   <ul class="hidden md:flex items-center gap-5">
     <!-- 通知 -->
     <!--    <li>-->
-    <!--      <UTooltip text="通知">-->
-    <!--        <UChip text="3" size="2xl" color="amber">-->
+    <!--      <ElTooltip content="通知">-->
+    <!--        <ElBadge :value="3" type="warning">-->
     <!--          <UIcon name="i-lucide:bell" class="action-icon" />-->
-    <!--        </UChip>-->
-    <!--      </UTooltip>-->
+    <!--        </ElBadge>-->
+    <!--      </ElTooltip>-->
     <!--    </li>-->
 
     <li>
-      <UTooltip text="加入QQ群">
+      <ElTooltip content="加入QQ群">
         <UIcon
           @click="modal.open(QQGroupModal)"
           name="i-tdesign:logo-qq-filled"
           class="size-7 text-zinc-400 hover:text-blue-500 cursor-pointer transition-colors"
         />
-      </UTooltip>
+      </ElTooltip>
     </li>
 
     <!-- Credential -->
@@ -60,7 +60,7 @@ const isCredentialActive = computed(() => credentialState.value === 'active');
         v-model:state="credentialState"
         @update:pending-count="credentialPendingCount = $event"
       />
-      <UTooltip text="抓取 Credentials">
+      <ElTooltip content="抓取 Credentials">
         <div class="relative">
           <UIcon
             @click="credentialsDialogOpen = true"
@@ -78,29 +78,29 @@ const isCredentialActive = computed(() => credentialState.value === 'active');
             {{ credentialBadgeText }}
           </span>
         </div>
-      </UTooltip>
+      </ElTooltip>
     </li>
 
     <!-- 文档 -->
     <li>
-      <UTooltip text="文档">
+      <ElTooltip content="文档">
         <UIcon
           name="i-lucide:book-open"
           @click="gotoLink(docsWebSite)"
           class="size-7 text-zinc-400 hover:text-blue-500 cursor-pointer transition-colors"
         />
-      </UTooltip>
+      </ElTooltip>
     </li>
 
     <!-- GitHub -->
     <li>
-      <UTooltip text="GitHub">
+      <ElTooltip content="GitHub">
         <UIcon
           @click="gotoLink('https://github.com/wechat-article/wechat-article-exporter')"
           name="i-lucide:github"
           class="size-7 text-zinc-400 hover:text-blue-500 cursor-pointer transition-colors"
         />
-      </UTooltip>
+      </ElTooltip>
     </li>
   </ul>
 </template>

@@ -1,20 +1,20 @@
 <template>
   <!-- session 过期时显示的持久化提醒条，引导用户重新扫码登录 -->
-  <UAlert
+  <ElAlert
     v-if="expired"
     class="rounded-none border-x-0 border-t-0"
-    color="orange"
-    variant="subtle"
+    type="warning"
     :title="alertTitle"
     :description="alertDescription"
-    icon="i-lucide:triangle-alert"
-    :actions="alertActions"
-  />
+  >
+    <template #default>
+      <ElButton type="warning" size="small" class="mt-2" @click="relogin">重新扫码登录</ElButton>
+    </template>
+  </ElAlert>
 </template>
 
 <script setup lang="ts">
 import { useIntervalFn } from '@vueuse/core';
-import type { AlertAction } from '#ui/types';
 import LoginModal from '~/components/modal/Login.vue';
 
 const modal = useDialog();
@@ -32,14 +32,9 @@ const alertDescription = computed(() => {
   return `检测到登录态在 ${timeStr} 已失效。后台定时同步将无法拉取新文章，请重新扫码登录后恢复。`;
 });
 
-const alertActions = computed<AlertAction[]>(() => [
-  {
-    label: '重新扫码登录',
-    color: 'orange',
-    variant: 'solid',
-    click: () => modal.open(LoginModal),
-  },
-]);
+function relogin() {
+  modal.open(LoginModal);
+}
 
 /**
  * 轮询 session 过期标志（每 60 秒一次）

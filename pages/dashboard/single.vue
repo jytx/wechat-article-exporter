@@ -815,88 +815,86 @@ async function removeRows() {
       <!-- 顶部操作区 -->
       <header class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-3 py-3">
         <div class="flex items-center gap-3">
-          <UInput v-model="inputUrl" placeholder="请输入公众号文章链接" class="w-64 lg:w-96" @keyup.enter="addArticle" />
-          <UButton color="blue" @click="addArticle">添加</UButton>
-          <UButton color="white" @click="openSearchDialog">搜索</UButton>
+          <ElInput v-model="inputUrl" placeholder="请输入公众号文章链接" class="w-64 lg:w-96" @keyup.enter="addArticle" />
+          <ElButton type="primary" @click="addArticle">添加</ElButton>
+          <ElButton @click="openSearchDialog">搜索</ElButton>
         </div>
         <div class="flex items-center gap-3">
           <!-- 抓取按钮组 -->
           <div class="flex items-center gap-0">
             <!-- 主抓取按钮 -->
-            <UButton
+            <ElButton
               :loading="downloadBtnLoading"
               :disabled="selectedArticleUrls.length === 0"
-              color="primary"
+              type="primary"
               class="font-mono rounded-r-none"
-              :label="downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : `抓取 (${downloadTypes.find(t => t.value === selectedDownloadType)?.label})`"
               @click="executeDownload"
-            />
+            >{{ downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : `抓取 (${downloadTypes.find(t => t.value === selectedDownloadType)?.label})` }}</ElButton
+            >
             <!-- 下拉选择按钮 -->
-            <UPopover>
-              <UButton
-                :disabled="selectedArticleUrls.length === 0 || downloadBtnLoading"
-                color="primary"
-                class="font-mono rounded-l-none border-l-0"
-                icon="i-heroicons-chevron-down-20-solid"
-              />
-              <template #panel>
-                <div class="p-1">
-                  <button
-                    v-for="type in downloadTypes"
-                    :key="type.value"
-                    @click="selectedDownloadType = type.value"
-                    class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    :class="{
-                      'bg-gray-100 dark:bg-gray-800': selectedDownloadType === type.value
-                    }"
-                  >
-                    {{ type.label }}
-                  </button>
-                </div>
+            <ElPopover>
+              <template #reference>
+                <ElButton
+                  :disabled="selectedArticleUrls.length === 0 || downloadBtnLoading"
+                  type="primary"
+                  class="font-mono rounded-l-none border-l-0"
+                  ><template #icon><UIcon name="i-heroicons-chevron-down-20-solid" /></template></ElButton
+                >
               </template>
-            </UPopover>
+              <div class="p-1">
+                <button
+                  v-for="type in downloadTypes"
+                  :key="type.value"
+                  @click="selectedDownloadType = type.value"
+                  class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  :class="{
+                    'bg-gray-100 dark:bg-gray-800': selectedDownloadType === type.value
+                  }"
+                >
+                  {{ type.label }}
+                </button>
+              </div>
+            </ElPopover>
           </div>
 
           <!-- 导出按钮组 -->
           <div class="flex items-center gap-0">
             <!-- 主导出按钮 -->
-            <UButton
+            <ElButton
               :loading="exportBtnLoading"
               :disabled="selectedArticleUrls.length === 0"
-              color="white"
               class="font-mono rounded-r-none"
-              :label="exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : `导出 (${exportFormats.find(f => f.value === selectedExportFormat)?.label})`"
               @click="executeExport"
-            />
+            >{{ exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : `导出 (${exportFormats.find(f => f.value === selectedExportFormat)?.label})` }}</ElButton
+            >
             <!-- 下拉选择按钮 -->
-            <UPopover>
-              <UButton
-                :disabled="selectedArticleUrls.length === 0 || exportBtnLoading"
-                color="white"
-                class="font-mono rounded-l-none border-l-0"
-                icon="i-heroicons-chevron-down-20-solid"
-              />
-              <template #panel>
-                <div class="p-1">
-                  <button
-                    v-for="format in exportFormats"
-                    :key="format.value"
-                    @click="selectedExportFormat = format.value"
-                    class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    :class="{
-                      'bg-gray-100 dark:bg-gray-800': selectedExportFormat === format.value
-                    }"
-                  >
-                    {{ format.label }}
-                  </button>
-                </div>
+            <ElPopover>
+              <template #reference>
+                <ElButton
+                  :disabled="selectedArticleUrls.length === 0 || exportBtnLoading"
+                  class="font-mono rounded-l-none border-l-0"
+                  ><template #icon><UIcon name="i-heroicons-chevron-down-20-solid" /></template></ElButton
+                >
               </template>
-            </UPopover>
+              <div class="p-1">
+                <button
+                  v-for="format in exportFormats"
+                  :key="format.value"
+                  @click="selectedExportFormat = format.value"
+                  class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  :class="{
+                    'bg-gray-100 dark:bg-gray-800': selectedExportFormat === format.value
+                  }"
+                >
+                  {{ format.label }}
+                </button>
+              </div>
+            </ElPopover>
           </div>
 
-          <UButton color="rose" variant="soft" :disabled="selectedArticleUrls.length === 0" @click="removeRows">
+          <ElButton type="danger" plain :disabled="selectedArticleUrls.length === 0" @click="removeRows">
             移除
-          </UButton>
+          </ElButton>
         </div>
       </header>
 

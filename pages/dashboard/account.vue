@@ -832,56 +832,52 @@
 	    <div class="flex flex-col h-full divide-y divide-gray-200">
 	      <!-- 顶部操作区 -->
 	      <header class="flex items-stretch gap-3 px-3 py-3">
-		        <UButton icon="i-lucide:user-plus" color="blue" :disabled="isDeleting || addBtnLoading" @click="addAccount">
-		          {{ addBtnLoading ? '添加中...' : '添加' }}
-		        </UButton>
-        <UButton icon="i-lucide:link" color="blue" :disabled="isDeleting || urlAdding" @click="urlModalOpen = true">
-		          {{ urlAdding ? '解析中...' : 'URL 添加' }}
-		        </UButton>
-        <UButton icon="i-lucide:arrow-down-to-line" color="blue" :loading="importBtnLoading" @click="importAccount">
-          批量导入
+	        <ElButton type="primary" :disabled="isDeleting || addBtnLoading" @click="addAccount">
+	          <template #icon><UIcon name="i-lucide:user-plus" /></template>{{ addBtnLoading ? '添加中...' : '添加' }}
+	        </ElButton>
+        <ElButton type="primary" :disabled="isDeleting || urlAdding" @click="urlModalOpen = true">
+	          <template #icon><UIcon name="i-lucide:link" /></template>{{ urlAdding ? '解析中...' : 'URL 添加' }}
+	        </ElButton>
+        <ElButton type="primary" :loading="importBtnLoading" @click="importAccount">
+          <template #icon><UIcon name="i-lucide:arrow-down-to-line" /></template>批量导入
           <input ref="fileRef" type="file" accept=".json" class="hidden" @change="handleFileChange" />
-        </UButton>
+        </ElButton>
         <BatchSearchAccounts @completed="refresh" />
-	        <UButton
-	          icon="i-lucide:arrow-up-from-line"
-	          color="blue"
+	        <ElButton
+	          type="primary"
 	          :loading="exportBtnLoading"
 	          :disabled="!hasSelectedRows"
 	          @click="exportAccount"
 	        >
+	          <template #icon><UIcon name="i-lucide:arrow-up-from-line" /></template>
 		         批量导出
-		        </UButton>
-		        <UButton icon="i-lucide:refresh-cw" color="blue" variant="soft" :loading="syncInfoLoading" :disabled="!hasSelectedRows" @click="syncAccountInfo">
-		          {{ syncInfoLoading ? '同步中...' : '同步信息' }}
-		        </UButton>
-	        <UButton
-	          color="rose"
-	          icon="i-lucide:user-minus"
+		        </ElButton>
+		        <ElButton type="primary" plain :loading="syncInfoLoading" :disabled="!hasSelectedRows" @click="syncAccountInfo">
+		          <template #icon><UIcon name="i-lucide:refresh-cw" /></template>{{ syncInfoLoading ? '同步中...' : '同步信息' }}
+		        </ElButton>
+	        <ElButton
+	          type="danger"
 	          class="disabled:opacity-35"
 	          :loading="isDeleting"
 	          :disabled="!hasSelectedRows"
 	          @click="deleteSelectedAccounts"
-	        >删除</UButton
+	        ><template #icon><UIcon name="i-lucide:user-minus" /></template>删除</ElButton
 	        >
-                <UButton
-                  color="black"
-                  icon="i-heroicons:arrow-path-rounded-square-20-solid"
+                <ElButton
                   class="disabled:opacity-35"
                   :loading="isSyncing"
                   :disabled="isDeleting || isSyncing || !hasSelectedRows"
                   @click="loadSelectedAccountArticle"
-                  >增量同步</UButton
+                  ><template #icon><UIcon name="i-heroicons:arrow-path-rounded-square-20-solid" /></template>增量同步</ElButton
                 >
-                <UButton
-                  color="primary"
-                  variant="outline"
-                  icon="i-heroicons:arrow-path"
+                <ElButton
+                  type="primary"
+                  plain
                   class="disabled:opacity-35"
                   :loading="isSyncing"
                   :disabled="isDeleting || isSyncing || !hasSelectedRows"
                   @click="resyncSelectedAccounts"
-                  >全量同步</UButton
+                  ><template #icon><UIcon name="i-heroicons:arrow-path" /></template>全量同步</ElButton
                 >
 	        <div class="hidden xl:flex flex-1 justify-end">
 	          <span class="self-end text-sm text-blue-500 font-medium">同步范围: {{ getActualDateRange() }}</span>
@@ -929,11 +925,11 @@
 	    <!-- 添加公众号弹框 -->
 	    <GlobalSearchAccountDialog ref="searchAccountDialogRef" @select:account="onSelectAccount" />
 
-	    <!-- URL 添加弹框 -->
-	    <UModal v-model="urlModalOpen">
-	      <div class="p-6">
+    <!-- URL 添加弹框 -->
+    <ElDialog v-model="urlModalOpen" width="520px">
+      <div class="p-6">
 	        <h3 class="text-lg font-semibold mb-4">通过 URL 添加公众号</h3>
-	        <UInput
+	        <ElInput
 	          v-model="urlInput"
 	          placeholder="粘贴公众号主页链接或文章链接"
 	          class="w-full font-mono"
@@ -944,12 +940,12 @@
 	          支持公众号主页链接（profile_ext）和文章链接（mp.weixin.qq.com/s/xxx）
 	        </p>
 	        <div class="flex justify-end gap-3 mt-6">
-	          <UButton color="gray" @click="urlModalOpen = false">取消</UButton>
-	          <UButton color="primary" :loading="urlAdding" :disabled="!urlInput.trim()" @click="addAccountByUrl">
+	          <ElButton @click="urlModalOpen = false">取消</ElButton>
+	          <ElButton type="primary" :loading="urlAdding" :disabled="!urlInput.trim()" @click="addAccountByUrl">
 	            解析并添加
-	          </UButton>
-	        </div>
-	      </div>
-	    </UModal>
-	  </div>
-	</template>
+	          </ElButton>
+        </div>
+      </div>
+    </ElDialog>
+  </div>
+</template>

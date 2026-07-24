@@ -19,13 +19,13 @@
 
 	<template>
 	  <div class="mt-0 flex items-center gap-2">
-	    <UProgress
-	      color="sky"
-	      :value="total > 0 ? count : 0"
-	      :max="total > 0 ? total : 1"
-	      class="w-24"
-	      :ui="{ progress: { base: 'h-2.5' } }"
-	    />
+    <ElProgress
+      :color="'#409eff'"
+      :percentage="Math.round((total > 0 ? count : 0) / (total > 0 ? total : 1) * 100)"
+      :show-text="false"
+      :stroke-width="10"
+      class="w-24"
+    />
 	    <span class="text-xs text-gray-500">
 	      {{ total > 0 ? `${count}/${total}` : '0/0' }}
 	    </span>

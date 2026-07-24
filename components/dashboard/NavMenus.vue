@@ -28,7 +28,7 @@ const items = ref<NavItem[]>([
         <NuxtLink :to="item.href" class="flex h-8 items-center gap-2 rounded-md px-2 text-sm nav-link">
           <UIcon :name="item.icon" class="size-5 opacity-80" />
           <p>{{ item.name }}</p>
-          <UBadge v-if="item.tags" v-for="tag in item.tags" color="fuchsia" variant="subtle">{{ tag }}</UBadge>
+          <ElTag v-if="item.tags" v-for="tag in item.tags" type="primary" effect="light">{{ tag }}</ElTag>
         </NuxtLink>
       </li>
     </ul>

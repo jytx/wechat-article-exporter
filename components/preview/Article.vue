@@ -1,8 +1,8 @@
 <template>
   <div>
-    <USlideover v-model="isOpen" :ui="{ width: 'max-w-[720px]' }">
+    <ElDrawer v-model="isOpen" size="720px">
       <HtmlRenderer :html="articleHtml" v-model:show="isOpen" />
-    </USlideover>
+    </ElDrawer>
   </div>
 </template>
 

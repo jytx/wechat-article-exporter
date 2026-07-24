@@ -1,13 +1,12 @@
 <template>
   <div class="h-screen">
-    <UButton
-      icon="i-lucide:x"
-      square
-      variant="link"
-      color="gray"
+    <ElButton
+      circle
+      link
       class="absolute right-3 top-3"
       @click="show = false"
-    ></UButton>
+      ><template #icon><UIcon name="i-lucide:x" /></template></ElButton
+    >
     <client-only>
       <iframe class="border-none w-full h-screen" :srcdoc="htmlContent"></iframe>
     </client-only>

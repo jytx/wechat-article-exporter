@@ -1,5 +1,5 @@
 <template>
-  <UCard>
+  <ElCard>
     <template #header>
       <h3 class="text-2xl font-semibold">文章订阅</h3>
       <p class="text-sm text-slate-10 font-serif">定时将最新同步的公众号文章通过邮件/Webhook 推送给你</p>
@@ -9,7 +9,7 @@
       <!-- 总开关 -->
       <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
-          <UCheckbox v-model="config.enabled" name="subEnabled" label="启用文章订阅" />
+          <ElCheckbox v-model="config.enabled" name="subEnabled">启用文章订阅</ElCheckbox>
           <span v-if="config.enabled" class="text-sm text-green-500 font-medium">已启用</span>
           <span v-else class="text-sm text-slate-400 font-medium">未启用</span>
         </div>
@@ -34,7 +34,7 @@
         <div>
           <label class="block text-sm mb-1">推送频率（Cron 表达式）</label>
           <div class="flex items-center gap-2 flex-wrap">
-            <UInput v-model="config.cron" placeholder="0 9 * * *" class="w-52 font-mono" />
+            <ElInput v-model="config.cron" placeholder="0 9 * * *" class="w-52 font-mono" />
             <span class="text-xs text-gray-400">
               <button type="button" class="text-blue-500 hover:underline" @click="config.cron = '0 9 * * *'">每天9点</button> ·
               <button type="button" class="text-blue-500 hover:underline" @click="config.cron = '0 9 * * 1'">每周一</button> ·
@@ -47,13 +47,17 @@
         <!-- 判断时间的字段 -->
         <div>
           <label class="block text-sm mb-1">时间依据</label>
-          <USelectMenu
+          <ElSelect
             v-model="config.timeField"
-            :options="TIME_FIELD_OPTIONS"
-            value-attribute="value"
-            option-attribute="label"
             class="w-52"
-          />
+          >
+            <ElOption
+              v-for="item in TIME_FIELD_OPTIONS"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </ElSelect>
           <p class="mt-1 text-xs text-gray-400">
             <span v-if="config.timeField === 'create_time'">按文章发布时间过滤：只推最近 {{ config.days }} 天发布的文章，与同步时间无关</span>
             <span v-else>按入库时间去重：每篇文章只推一次，调高频率也不会重复</span>
@@ -63,11 +67,11 @@
         <!-- 时间范围 -->
         <div>
           <label class="block text-sm mb-1">时间范围</label>
-          <UInput v-model.number="config.days" type="number" :min="1" :max="30" class="w-32 font-mono">
-            <template #trailing>
+          <ElInput v-model.number="config.days" type="number" :min="1" :max="30" class="w-32 font-mono">
+            <template #suffix>
               <span class="text-gray-500 dark:text-gray-400 text-xs">天</span>
             </template>
-          </UInput>
+          </ElInput>
           <p class="mt-1 text-xs text-gray-400">
             <span v-if="config.timeField === 'create_time'">推送最近 {{ config.days }} 天内发布的文章</span>
             <span v-else>首次推送回溯 {{ config.days }} 天入库的文章</span>
@@ -77,38 +81,37 @@
         <!-- 最大文章数 -->
         <div>
           <label class="block text-sm mb-1">单次最多推送</label>
-          <UInput v-model.number="config.maxArticles" type="number" :min="1" :max="500" class="w-32 font-mono">
-            <template #trailing>
+          <ElInput v-model.number="config.maxArticles" type="number" :min="1" :max="500" class="w-32 font-mono">
+            <template #suffix>
               <span class="text-gray-500 dark:text-gray-400 text-xs">篇</span>
             </template>
-          </UInput>
+          </ElInput>
           <p class="mt-1 text-xs text-gray-400">超过此数量的文章不会包含在本次推送中</p>
         </div>
 
         <!-- 无新文章时跳过 -->
-        <UCheckbox
+        <ElCheckbox
           v-model="config.onlyNewArticles"
           name="onlyNew"
-          label="没有新文章时不发送"
-        />
+          >没有新文章时不发送</ElCheckbox
+        >
       </div>
 
       <!-- 测试发送 -->
       <div v-if="config.enabled" class="border-t border-slate-200 dark:border-slate-700 pt-4">
-        <UButton
-          size="xs"
-          color="gray"
-          icon="i-lucide:send"
+        <ElButton
+          size="small"
           :loading="testing"
           :disabled="testing"
           @click="testSend"
         >
+          <template #icon><UIcon name="i-lucide:send" /></template>
           立即发送一次（测试）
-        </UButton>
+        </ElButton>
         <p class="mt-1 text-xs text-gray-400">使用当前已保存的配置立即推送一次，不需要等 cron 触发</p>
       </div>
     </div>
-  </UCard>
+  </ElCard>
 </template>
 
 <script setup lang="ts">

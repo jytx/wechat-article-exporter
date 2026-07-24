@@ -1,99 +1,90 @@
 <template>
-  <USlideover v-model="open" :ui="{ width: 'max-w-[500px]' }">
-    <UCard
-      class="flex flex-col flex-1"
-      :ui="{ body: { base: 'flex-1' }, ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }"
-    >
-      <template #header>
-        <div class="flex justify-between items-center">
-          <h2 class="font-bold text-2xl">抓取 Credentials</h2>
-        </div>
-      </template>
+  <ElDrawer v-model="open" size="500px">
+    <template #header>
+      <div class="flex justify-between items-center">
+        <h2 class="font-bold text-2xl">抓取 Credentials</h2>
+      </div>
+    </template>
 
-      <div>
-        <UTabs
-          :items="tabs"
-          :ui="{ list: { marker: { background: 'bg-blue-500 text-white' }, tab: { active: 'text-white' } } }"
-        >
-          <template #item="{ item }">
-            <div v-if="item.key === 'wxdown'" class="space-y-5">
+    <div class="flex-1">
+        <ElTabs v-model="activeTab">
+          <ElTabPane label="wxdown 程序版" name="wxdown">
+            <div class="space-y-5">
               <p class="flex items-center text-sm">
                 <span class="text-rose-500 font-semibold">所需软件：</span>
-                <UButton @click="downloadProgram" variant="ghost" color="gray"
+                <ElButton @click="downloadProgram" text
                   >去下载 wxdown-service 程序
                   <UIcon name="i-lucide:arrow-up-right" class="size-5" />
-                </UButton>
+                </ElButton>
               </p>
               <div class="flex justify-between items-center gap-3">
-                <UInput
+                <ElInput
                   class="flex-1"
-                  color="gray"
                   type="url"
                   v-model="wsURL"
                   :disabled="monitoring || wsMonitoring"
                   placeholder="请输入 ws 监听地址"
                 />
-                <UButton
+                <ElButton
                   v-if="!wsMonitoring"
+                  type="primary"
                   :disabled="!wsURL || monitoring"
-                  color="blue"
                   @click="startListenService(true)"
                 >
                   开始监控
-                </UButton>
-                <UButton v-else icon="i-line-md:loading-twotone-loop" color="green" @click="stopListenService"
-                  >监控中，结束监控</UButton
+                </ElButton>
+                <ElButton v-else type="success" @click="stopListenService"
+                  ><template #icon><UIcon name="i-line-md:loading-twotone-loop" /></template>监控中，结束监控</ElButton
                 >
               </div>
             </div>
-            <div v-if="item.key === 'mitmproxy'">
-              <p class="flex items-center text-sm">
-                <span class="text-rose-500 font-semibold">所需软件：</span>
-                <UButton @click="downloadPlugin" variant="ghost" color="gray"
-                  >去下载 mitmproxy 插件
-                  <UIcon name="i-lucide:arrow-up-right" class="size-5" />
-                </UButton>
-              </p>
-              <div class="text-sm my-5">
-                <p class="flex justify-between items-end">执行以下命令启动 mitmproxy 服务并加载 credential.py 插件：</p>
-                <p class="flex justify-between items-center bg-black text-white p-2 my-2 rounded-md">
-                  <code>mitmdump -s credential.py -q</code>
-                  <UIcon v-if="copied" name="i-lucide:copy-check" />
-                  <UIcon
-                    v-else
-                    name="i-lucide:copy"
-                    class="cursor-pointer"
-                    @click="copy('mitmdump -s credential.py -q')"
-                  />
-                </p>
-              </div>
-              <div class="flex justify-between items-center gap-3">
-                <UInput
-                  class="flex-1"
-                  color="gray"
-                  v-model="apiKey"
-                  :disabled="authorized || wsMonitoring"
-                  placeholder="请输入API Key"
+          </ElTabPane>
+          <ElTabPane label="mitmproxy 插件版" name="mitmproxy">
+            <p class="flex items-center text-sm">
+              <span class="text-rose-500 font-semibold">所需软件：</span>
+              <ElButton @click="downloadPlugin" text
+                >去下载 mitmproxy 插件
+                <UIcon name="i-lucide:arrow-up-right" class="size-5" />
+              </ElButton>
+            </p>
+            <div class="text-sm my-5">
+              <p class="flex justify-between items-end">执行以下命令启动 mitmproxy 服务并加载 credential.py 插件：</p>
+              <p class="flex justify-between items-center bg-black text-white p-2 my-2 rounded-md">
+                <code>mitmdump -s credential.py -q</code>
+                <UIcon v-if="copied" name="i-lucide:copy-check" />
+                <UIcon
+                  v-else
+                  name="i-lucide:copy"
+                  class="cursor-pointer"
+                  @click="copy('mitmdump -s credential.py -q')"
                 />
-                <UButton
-                  class="px-5"
-                  color="blue"
-                  :loading="authorizeBtnLoading"
-                  :disabled="!apiKey || authorized || wsMonitoring || monitoring"
-                  @click="authorize"
-                  >认证</UButton
-                >
-
-                <UButton v-if="!monitoring" :disabled="!authorized || wsMonitoring" color="blue" @click="start"
-                  >开始监控</UButton
-                >
-                <UButton v-else icon="i-line-md:loading-twotone-loop" color="green" @click="stop"
-                  >监控中，结束监控</UButton
-                >
-              </div>
+              </p>
             </div>
-          </template>
-        </UTabs>
+            <div class="flex justify-between items-center gap-3">
+              <ElInput
+                class="flex-1"
+                v-model="apiKey"
+                :disabled="authorized || wsMonitoring"
+                placeholder="请输入API Key"
+              />
+              <ElButton
+                class="px-5"
+                type="primary"
+                :loading="authorizeBtnLoading"
+                :disabled="!apiKey || authorized || wsMonitoring || monitoring"
+                @click="authorize"
+                >认证</ElButton
+              >
+
+              <ElButton v-if="!monitoring" type="primary" :disabled="!authorized || wsMonitoring" @click="start"
+                >开始监控</ElButton
+              >
+              <ElButton v-else type="success" @click="stop"
+                ><template #icon><UIcon name="i-line-md:loading-twotone-loop" /></template>监控中，结束监控</ElButton
+              >
+            </div>
+          </ElTabPane>
+        </ElTabs>
         <ul class="flex flex-col mt-3 p-1 gap-4 overflow-y-scroll h-[calc(100vh-20rem)] no-scrollbar">
           <li
             v-for="credential in credentials"
@@ -110,31 +101,29 @@
               <div class="flex items-center justify-between mt-4">
                 <span v-if="credential.valid" class="font-sans font-bold text-green-500">有效</span>
                 <span v-else class="font-sans font-bold text-rose-500">已过期</span>
-                <UButton
-                  size="xs"
-                  :color="credential.added ? 'green' : 'blue'"
-                  :variant="credential.added ? 'soft' : 'solid'"
+                <ElButton
+                  size="small"
+                  type="primary"
                   :disabled="credential.added || addingBiz === credential.biz"
                   :loading="addingBiz === credential.biz"
                   @click="addAccount(credential)"
                 >
                   {{ credential.added ? '已添加' : '添加公众号' }}
-                </UButton>
+                </ElButton>
               </div>
             </div>
-            <UButton
+            <ElButton
               v-if="isDev"
               :loading="pullArticleLoading"
               class="absolute top-3 right-3"
               @click="pullData(credential.biz)"
             >
               拉取数据
-            </UButton>
+            </ElButton>
           </li>
         </ul>
       </div>
-    </UCard>
-  </USlideover>
+  </ElDrawer>
 </template>
 
 <script setup lang="ts">
@@ -177,6 +166,8 @@ const tabs = [
     label: 'mitmproxy 插件版',
   },
 ];
+
+const activeTab = ref('wxdown');
 
 const { checkLogin } = useLoginCheck();
 

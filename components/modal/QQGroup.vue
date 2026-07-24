@@ -12,9 +12,9 @@ function onClose() {
   <div>
     <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
       <h2 class="text-lg font-semibold">加入 QQ 群</h2>
-      <UButton square variant="link" color="gray" class="absolute right-3 top-3" @click="onClose">
+      <ElButton circle link class="absolute right-3 top-3" @click="onClose">
         <UIcon name="i-lucide:x" class="size-6" />
-      </UButton>
+      </ElButton>
     </div>
 
     <!-- 二维码图片展示区 -->

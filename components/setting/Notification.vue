@@ -1,5 +1,5 @@
 <template>
-  <UCard>
+  <ElCard>
     <template #header>
       <h3 class="text-2xl font-semibold">消息通知</h3>
       <p class="text-sm text-slate-10 font-serif">配置邮箱与 Webhook，在同步完成、登录过期等事件时接收通知</p>
@@ -8,65 +8,64 @@
     <div class="flex flex-col space-y-6">
       <!-- 总开关 + 通知事件 -->
       <div class="flex flex-col gap-3">
-        <UCheckbox v-model="config.enabled" name="notifEnabled" label="启用消息通知" />
+        <ElCheckbox v-model="config.enabled" name="notifEnabled">启用消息通知</ElCheckbox>
 
         <div v-if="config.enabled" class="pl-6 border-l-2 border-slate-200 dark:border-slate-700 flex flex-col gap-2">
           <p class="text-sm text-slate-500 mb-1">通知事件（勾选后，对应事件发生时推送通知）</p>
-          <UCheckbox v-model="config.events.syncComplete" name="evSync" label="定时同步完成" />
-          <UCheckbox v-model="config.events.sessionExpired" name="evSession" label="登录态过期" />
-          <UCheckbox v-model="config.events.syncFailed" name="evFailed" label="同步失败告警" />
-          <UCheckbox v-model="config.events.articleDigest" name="evDigest" label="文章订阅推送" />
+          <ElCheckbox v-model="config.events.syncComplete" name="evSync">定时同步完成</ElCheckbox>
+          <ElCheckbox v-model="config.events.sessionExpired" name="evSession">登录态过期</ElCheckbox>
+          <ElCheckbox v-model="config.events.syncFailed" name="evFailed">同步失败告警</ElCheckbox>
+          <ElCheckbox v-model="config.events.articleDigest" name="evDigest">文章订阅推送</ElCheckbox>
         </div>
       </div>
 
       <!-- SMTP 邮箱区 -->
       <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
         <div class="flex items-center justify-between mb-3">
-          <UCheckbox v-model="config.email.enabled" name="emailEnabled" label="SMTP 邮箱通知" />
-          <UButton
+          <ElCheckbox v-model="config.email.enabled" name="emailEnabled">SMTP 邮箱通知</ElCheckbox>
+          <ElButton
             v-if="config.email.enabled"
-            size="xs"
-            color="gray"
-            icon="i-lucide:send"
+            size="small"
             :loading="testingEmail"
             :disabled="testingEmail"
             @click="testEmail"
           >
+            <template #icon><UIcon name="i-lucide:send" /></template>
             测试发送
-          </UButton>
+          </ElButton>
         </div>
 
         <div v-if="config.email.enabled" class="flex flex-col gap-4">
           <div>
             <label class="block text-sm mb-1">SMTP 服务器</label>
-            <UInput v-model="config.email.host" placeholder="smtp.qq.com" class="font-mono w-full max-w-md" />
+            <ElInput v-model="config.email.host" placeholder="smtp.qq.com" class="font-mono w-full max-w-md" />
           </div>
           <div class="flex items-end gap-4 flex-wrap">
             <div>
               <label class="block text-sm mb-1">端口</label>
-              <UInput v-model.number="config.email.port" type="number" placeholder="465" class="font-mono w-24" />
+              <ElInput v-model.number="config.email.port" type="number" placeholder="465" class="font-mono w-24" />
             </div>
-            <UCheckbox v-model="config.email.secure" name="emailSecure" label="SSL/TLS 加密" class="mb-2" />
+            <ElCheckbox v-model="config.email.secure" name="emailSecure" class="mb-2">SSL/TLS 加密</ElCheckbox>
             <span class="text-xs text-gray-400 mb-2">端口 465 通常开启，587 通常关闭</span>
           </div>
           <div class="flex gap-4 flex-wrap">
             <div class="flex-1 min-w-[200px]">
               <label class="block text-sm mb-1">发件邮箱账号</label>
-              <UInput v-model="config.email.user" placeholder="user@qq.com" class="font-mono w-full" />
+              <ElInput v-model="config.email.user" placeholder="user@qq.com" class="font-mono w-full" />
             </div>
             <div class="flex-1 min-w-[200px]">
               <label class="block text-sm mb-1">授权码 / 密码</label>
-              <UInput v-model="config.email.pass" type="password" placeholder="SMTP 授权码" class="font-mono w-full" />
+              <ElInput v-model="config.email.pass" type="password" placeholder="SMTP 授权码" class="font-mono w-full" />
             </div>
           </div>
           <div class="flex gap-4 flex-wrap">
             <div>
               <label class="block text-sm mb-1">发件人名称</label>
-              <UInput v-model="config.email.fromName" placeholder="微信文章导出器" class="w-52" />
+              <ElInput v-model="config.email.fromName" placeholder="微信文章导出器" class="w-52" />
             </div>
             <div class="flex-1 min-w-[200px]">
               <label class="block text-sm mb-1">收件邮箱</label>
-              <UInput v-model="config.email.to" placeholder="多个用逗号分隔" class="font-mono w-full" />
+              <ElInput v-model="config.email.to" placeholder="多个用逗号分隔" class="font-mono w-full" />
             </div>
           </div>
         </div>
@@ -75,39 +74,42 @@
       <!-- Webhook 区 -->
       <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
         <div class="flex items-center justify-between mb-3">
-          <UCheckbox v-model="config.webhook.enabled" name="webhookEnabled" label="Webhook 通知" />
-          <UButton
+          <ElCheckbox v-model="config.webhook.enabled" name="webhookEnabled">Webhook 通知</ElCheckbox>
+          <ElButton
             v-if="config.webhook.enabled"
-            size="xs"
-            color="gray"
-            icon="i-lucide:send"
+            size="small"
             :loading="testingWebhook"
             :disabled="testingWebhook"
             @click="testWebhook"
           >
+            <template #icon><UIcon name="i-lucide:send" /></template>
             测试发送
-          </UButton>
+          </ElButton>
         </div>
 
         <div v-if="config.webhook.enabled" class="flex flex-col gap-4">
           <div>
             <label class="block text-sm mb-1">平台类型</label>
-            <USelectMenu
+            <ElSelect
               v-model="config.webhook.type"
-              :options="WEBHOOK_OPTIONS"
-              value-attribute="value"
-              option-attribute="label"
               class="w-52"
-            />
+            >
+              <ElOption
+                v-for="item in WEBHOOK_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </ElSelect>
           </div>
           <div>
             <label class="block text-sm mb-1">Webhook URL</label>
-            <UInput v-model="config.webhook.url" placeholder="https://..." class="font-mono w-full max-w-2xl" />
+            <ElInput v-model="config.webhook.url" placeholder="https://..." class="font-mono w-full max-w-2xl" />
           </div>
         </div>
       </div>
     </div>
-  </UCard>
+  </ElCard>
 </template>
 
 <script setup lang="ts">

@@ -926,115 +926,112 @@ function copyWechatLink() {
         <div class="flex flex-col xl:flex-row gap-2">
           <div class="flex space-x-3">
             <AccountSelectorForArticle v-model="selectedAccount" class="w-80" />
-            <UInput
+            <ElInput
               v-model="searchKeyword"
               placeholder="搜索标题或摘要..."
-              color="gray"
-              size="md"
               class="w-80"
               @keyup.enter="handleSearch"
               @blur="handleSearch"
             >
-              <template v-if="searchKeyword && searchKeyword.length > 0" #trailing>
+              <template v-if="searchKeyword && searchKeyword.length > 0" #suffix>
                 <span class="text-gray-400 cursor-pointer hover:text-gray-600" @click="clearSearch">
                   <UIcon name="i-heroicons-x-mark-20-solid" />
                 </span>
               </template>
-            </UInput>
-            <UButton color="white" icon="i-lucide:search" @click="openSearchDialog">全网搜索</UButton>
+            </ElInput>
+            <ElButton @click="openSearchDialog"><template #icon><UIcon name="i-lucide:search" /></template>全网搜索</ElButton>
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <UButton
+          <ElButton
             v-if="downloadBtnLoading"
-            color="black"
             @click="stopDownload"
           >
             停止
-          </UButton>
+          </ElButton>
 
           <!-- 抓取按钮组 -->
           <div class="flex items-center gap-0">
             <!-- 主抓取按钮 -->
-            <UButton
+            <ElButton
               :loading="downloadBtnLoading"
               :disabled="!selectedAccount"
-              color="white"
               class="font-mono rounded-r-none"
-              :label="downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : `抓取 (${downloadTypes.find(t => t.value === selectedDownloadType)?.label})`"
               @click="executeDownload"
-            />
+            >{{ downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : `抓取 (${downloadTypes.find(t => t.value === selectedDownloadType)?.label})` }}</ElButton
+            >
             <!-- 下拉选择按钮 -->
-            <UPopover>
-              <UButton
-                :disabled="!selectedAccount || downloadBtnLoading"
-                color="white"
-                class="font-mono rounded-l-none border-l-0"
-                icon="i-heroicons-chevron-down-20-solid"
-              />
-              <template #panel>
-                <div class="p-1">
-                  <button
-                    v-for="type in downloadTypes"
-                    :key="type.value"
-                    @click="selectedDownloadType = type.value"
-                    class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    :class="{
-                      'bg-gray-100 dark:bg-gray-800': selectedDownloadType === type.value
-                    }"
-                  >
-                    {{ type.label }}
-                  </button>
-                </div>
+            <ElPopover>
+              <template #reference>
+                <ElButton
+                  :disabled="!selectedAccount || downloadBtnLoading"
+                  class="font-mono rounded-l-none border-l-0"
+                  ><template #icon><UIcon name="i-heroicons-chevron-down-20-solid" /></template></ElButton
+                >
               </template>
-            </UPopover>
+              <div class="p-1">
+                <button
+                  v-for="type in downloadTypes"
+                  :key="type.value"
+                  @click="selectedDownloadType = type.value"
+                  class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  :class="{
+                    'bg-gray-100 dark:bg-gray-800': selectedDownloadType === type.value
+                  }"
+                >
+                  {{ type.label }}
+                </button>
+              </div>
+            </ElPopover>
           </div>
 
           <!-- 导出按钮组 -->
           <div class="flex items-center gap-0">
             <!-- 主导出按钮 -->
-            <UButton
+            <ElButton
               :loading="exportBtnLoading"
               :disabled="!selectedAccount"
-              color="white"
               class="font-mono rounded-r-none"
-              :label="exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : `导出 (${exportFormats.find(f => f.value === selectedExportFormat)?.label})`"
               @click="executeExport"
-            />
+            >{{ exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : `导出 (${exportFormats.find(f => f.value === selectedExportFormat)?.label})` }}</ElButton
+            >
             <!-- 下拉选择按钮 -->
-            <UPopover>
-              <UButton
-                :disabled="!selectedAccount || exportBtnLoading"
-                color="white"
-                class="font-mono rounded-l-none border-l-0"
-                icon="i-heroicons-chevron-down-20-solid"
-              />
-              <template #panel>
-                <div class="p-1">
-                  <button
-                    v-for="format in exportFormats"
-                    :key="format.value"
-                    @click="selectedExportFormat = format.value"
-                    class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    :class="{
-                      'bg-gray-100 dark:bg-gray-800': selectedExportFormat === format.value
-                    }"
-                  >
-                    {{ format.label }}
-                  </button>
-                </div>
+            <ElPopover>
+              <template #reference>
+                <ElButton
+                  :disabled="!selectedAccount || exportBtnLoading"
+                  class="font-mono rounded-l-none border-l-0"
+                  ><template #icon><UIcon name="i-heroicons-chevron-down-20-solid" /></template></ElButton
+                >
               </template>
-            </UPopover>
+              <div class="p-1">
+                <button
+                  v-for="format in exportFormats"
+                  :key="format.value"
+                  @click="selectedExportFormat = format.value"
+                  class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  :class="{
+                    'bg-gray-100 dark:bg-gray-800': selectedExportFormat === format.value
+                  }"
+                >
+                  {{ format.label }}
+                </button>
+              </div>
+            </ElPopover>
           </div>
 
-          <UButton
+          <ElButton
             :disabled="!selectedAccount"
-            :icon="copied ? 'i-lucide:check' : 'i-heroicons-link-16-solid'"
-            label="复制公众号链接"
-            :color="copied ? 'green' : 'blue'"
+            type="primary"
             @click="copyWechatLink"
-          />
-          <UButton v-if="isDev" @click="debug">调试</UButton>
+          >
+            <template #icon>
+              <UIcon v-if="copied" name="i-lucide:check" />
+              <UIcon v-else name="i-heroicons-link-16-solid" />
+            </template>
+            复制公众号链接
+          </ElButton>
+          <ElButton v-if="isDev" @click="debug">调试</ElButton>
         </div>
       </header>
 
@@ -1087,13 +1084,13 @@ function copyWechatLink() {
           共 {{ pagination.total }} 条记录，第 {{ currentPage }} / {{ pagination.totalPages }} 页
         </div>
         <div class="flex items-center gap-2">
-          <UButton
-            icon="i-heroicons-chevron-left"
+          <ElButton
             :disabled="currentPage === 1"
             @click="currentPage > 1 && (currentPage--, setPage(currentPage), refresh())"
-          />
+            ><template #icon><UIcon name="i-heroicons-chevron-left" /></template></ElButton
+          >
           <div class="flex items-center gap-1">
-            <UInput
+            <ElInput
               type="number"
               v-model="inputPage"
               :min="1"
@@ -1104,24 +1101,23 @@ function copyWechatLink() {
             />
             <span class="text-sm text-gray-600 dark:text-gray-400">/ {{ pagination.totalPages }}</span>
           </div>
-          <UButton
-            icon="i-heroicons-chevron-right"
+          <ElButton
             :disabled="currentPage === pagination.totalPages"
             @click="currentPage < pagination.totalPages && (currentPage++, setPage(currentPage), refresh())"
-          />
-          <UButton
-            icon="i-heroicons-arrow-uturn-right"
-            size="sm"
-            color="gray"
-            variant="ghost"
+            ><template #icon><UIcon name="i-heroicons-chevron-right" /></template></ElButton
+          >
+          <ElButton
+            size="small"
+            text
             @click="
               currentPage = 1;
               setPage(1);
               refresh();
             "
           >
+            <template #icon><UIcon name="i-heroicons-arrow-uturn-right" /></template>
             <span class="sr-only">刷新</span>
-          </UButton>
+          </ElButton>
         </div>
       </div>
     </div>

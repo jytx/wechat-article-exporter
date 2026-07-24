@@ -1,41 +1,25 @@
 <template>
-  <USelectMenu
+  <ElSelect
     v-model="selected"
-    size="md"
-    color="gray"
-    searchable
-    searchable-placeholder="筛选公众号..."
-    clear-search-on-close
-    :options="sortedAccountInfos"
-    option-attribute="nickname"
+    size="default"
+    filterable
     placeholder="请选择公众号"
     :loading="loading"
+    class="w-full"
   >
-    <template #label>
-      <UAvatar v-if="selected && selected.fakeid" :src="selected.round_head_img" size="2xs" />
-      <span v-if="selected" class="max-w-30 line-clamp-1">{{ selected.nickname }}</span>
-      <span v-if="selected && selected.fakeid" class="shrink-0">({{ selected.synced_count }}篇)</span>
-      <span v-if="selected && !selected.fakeid" class="shrink-0">共 {{ selected.synced_count }}篇</span>
-    </template>
-    <template #option="{ option: account }">
-      <UAvatar :src="account.round_head_img" size="sm" />
+    <ElOption
+      v-for="account in sortedAccountInfos"
+      :key="account.fakeid"
+      :label="account.nickname"
+      :value="account"
+    >
+      <ElAvatar :src="account.round_head_img" size="small" />
       <div>
         <p class="text-[16px]">{{ account.nickname }}</p>
         <p class="text-gray-500 text-sm">已加载文章数: {{ account.synced_count }}</p>
       </div>
-    </template>
-    <template #option-empty="{ query }">
-      未找到匹配「{{ query }}」的公众号<br />请先在「<NuxtLink
-        to="/dashboard/account"
-        class="text-blue-500 hover:underline"
-        >公众号管理</NuxtLink
-      >」中添加
-    </template>
-    <template #empty>
-      暂无公众号，请先在「<NuxtLink to="/dashboard/account" class="text-blue-500 hover:underline">公众号管理</NuxtLink
-      >」中添加
-    </template>
-  </USelectMenu>
+    </ElOption>
+  </ElSelect>
 </template>
 
 <script setup lang="ts">

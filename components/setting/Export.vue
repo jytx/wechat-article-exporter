@@ -1,5 +1,5 @@
 <template>
-  <UCard>
+  <ElCard>
     <template #header>
       <h3 class="text-2xl font-semibold">导出选项</h3>
       <p class="text-sm text-slate-10 font-serif">配置文章的导出选项</p>
@@ -10,38 +10,38 @@
         <p class="mb-2">
           <span class="mr-3">导出目录名:</span>
           <span class="inline-block w-8">
-            <UPopover mode="hover" :popper="{ placement: 'right' }">
-              <UButton color="white" size="sm" trailing-icon="i-heroicons:variable-16-solid" />
-
-              <template #panel>
-                <div class="p-4">
-                  <p class="my-2 text-sm text-gray-500">
-                    使用 <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">${变量名}</code> 的格式插入变量，例如：<code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">${YYYY}-${MM}-${DD}_${title}</code>
-                  </p>
-                  <p class="my-2 font-medium">支持的变量：</p>
-                  <table class="w-full border-collapse border">
-                    <tbody>
-                      <tr>
-                        <th class="w-20">变量</th>
-                        <th class="w-32">含义</th>
-                        <th class="w-20">变量</th>
-                        <th class="w-32">含义</th>
-                      </tr>
-                      <tr v-for="(item, idx) in variables" :key="idx">
-                        <td class="text-center">{{ item[0].name }}</td>
-                        <td class="text-center">{{ item[0].description }}</td>
-                        <td class="text-center">{{ item[1].name }}</td>
-                        <td class="text-center">{{ item[1].description }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+            <ElPopover trigger="hover" placement="right">
+              <template #reference>
+                <ElButton size="small" />
               </template>
-            </UPopover>
+
+              <div class="p-4">
+                <p class="my-2 text-sm text-gray-500">
+                  使用 <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">${变量名}</code> 的格式插入变量，例如：<code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">${YYYY}-${MM}-${DD}_${title}</code>
+                </p>
+                <p class="my-2 font-medium">支持的变量：</p>
+                <table class="w-full border-collapse border">
+                  <tbody>
+                    <tr>
+                      <th class="w-20">变量</th>
+                      <th class="w-32">含义</th>
+                      <th class="w-20">变量</th>
+                      <th class="w-32">含义</th>
+                    </tr>
+                    <tr v-for="(item, idx) in variables" :key="idx">
+                      <td class="text-center">{{ item[0].name }}</td>
+                      <td class="text-center">{{ item[0].description }}</td>
+                      <td class="text-center">{{ item[1].name }}</td>
+                      <td class="text-center">{{ item[1].description }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </ElPopover>
           </span>
         </p>
         <p class="text-sm mb-2 text-gray-500">影响 <span class="font-mono">html/txt/markdown/word/pdf</span> 的导出</p>
-        <UInput
+        <ElInput
           placeholder="目录名格式"
           class="w-[600px] font-mono"
           name="dirname"
@@ -57,17 +57,17 @@
         <p class="mb-2 flex items-center gap-3">
           <span>导出路径:</span>
           <span class="text-xs text-gray-500">(服务端文件系统路径，所有导出文件将保存到此目录)</span>
-          <UPopover mode="hover" :popper="{ placement: 'top' }">
-            <template #panel>
-              <p class="max-w-[300px] p-3 text-sm text-gray-500">
-                设置导出文件的服务端保存路径。例如：<code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">./exports</code> 或 <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">/home/user/downloads</code>。<br />
-                路径相对于项目根目录或使用绝对路径。确保服务端有该目录的写入权限。
-              </p>
+          <ElPopover trigger="hover" placement="top">
+            <p class="max-w-[300px] p-3 text-sm text-gray-500">
+              设置导出文件的服务端保存路径。例如：<code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">./exports</code> 或 <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">/home/user/downloads</code>。<br />
+              路径相对于项目根目录或使用绝对路径。确保服务端有该目录的写入权限。
+            </p>
+            <template #reference>
+              <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
             </template>
-            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
-          </UPopover>
+          </ElPopover>
         </p>
-        <UInput
+        <ElInput
           placeholder="导出路径"
           v-model="preferences.exportConfig.exportPath"
           class="w-[600px] font-mono"
@@ -77,7 +77,7 @@
         <p class="mb-2 flex items-center gap-3">
           <span>目录名最大长度:</span>
           <span class="text-xs text-gray-500">(0表示不限制)</span>
-          <UInput
+          <ElInput
             class=""
             placeholder="目录名最大长度"
             v-model="preferences.exportConfig.maxlength"
@@ -87,33 +87,33 @@
         </p>
       </div>
       <div>
-        <UCheckbox
+        <ElCheckbox
           v-model="preferences.exportConfig.exportExcelIncludeContent"
           name="exportExcelIncludeContent"
-          label="导出 Excel 中包含文章内容"
-        />
+          >导出 Excel 中包含文章内容</ElCheckbox
+        >
       </div>
       <div>
-        <UCheckbox
+        <ElCheckbox
           v-model="preferences.exportConfig.exportJsonIncludeContent"
           name="exportJsonIncludeContent"
-          label="导出 JSON 中包含文章内容"
-        />
-        <UCheckbox
+          >导出 JSON 中包含文章内容</ElCheckbox
+        >
+        <ElCheckbox
           v-model="preferences.exportConfig.exportJsonIncludeComments"
           name="exportJsonIncludeComments"
-          label="导出 JSON 中包含留言数据"
-        />
+          >导出 JSON 中包含留言数据</ElCheckbox
+        >
       </div>
       <div>
-        <UCheckbox
+        <ElCheckbox
           v-model="preferences.exportConfig.exportHtmlIncludeComments"
           name="exportHtmlIncludeComments"
-          label="导出 HTML 中包含留言数据"
-        />
+          >导出 HTML 中包含留言数据</ElCheckbox
+        >
       </div>
     </div>
-  </UCard>
+  </ElCard>
 </template>
 
 <script setup lang="ts">

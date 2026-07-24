@@ -10,15 +10,19 @@
         <div class="flex gap-2">
           <div class="flex items-center space-x-3">
             <AccountSelectorForAlbum v-model="selectedAccount" class="w-80" />
-            <USelectMenu
+            <ElSelect
               class="w-60"
-              color="gray"
               v-model="selectedAlbum"
-              :options="selectedAccount?.albums || []"
-              option-attribute="title"
-              size="md"
+              size="default"
               placeholder="选择合集"
-            />
+            >
+              <ElOption
+                v-for="album in (selectedAccount?.albums || [])"
+                :key="album.id"
+                :label="album.title"
+                :value="album"
+              />
+            </ElSelect>
             <div>
               <Loader v-if="switchSortLoading" :size="24" class="animate-spin text-slate-500" />
               <div v-else class="flex space-x-2 w-fit" @click="toggleReverse">
@@ -27,30 +31,24 @@
                 <span>{{ isReverse ? '正序' : '倒序' }}</span>
               </div>
             </div>
-            <UButton
-              color="black"
-              variant="solid"
+            <ElButton
               class="disabled:bg-slate-4 disabled:text-slate-12"
               :loading="fetchAllArticlesBtnLoading"
               :disabled="!selectedAccount || !selectedAlbum || albumArticles.length === 0 || noMoreData"
               @click="fetchAllArticles"
-              >抓取全部文章链接</UButton
+              >抓取全部文章链接</ElButton
             >
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <UButton
-            color="blue"
-            variant="link"
-            size="md"
+          <ElButton
+            type="primary"
+            link
             :disabled="!selectedAccount || !selectedAlbum"
             @click="gotoLink(originalAlbumURL)"
-            >跳转到原始链接</UButton
+            >跳转到原始链接</ElButton
           >
-          <UButton
-            color="black"
-            variant="solid"
-            size="md"
+          <ElButton
             class="disabled:bg-slate-4 disabled:text-slate-12"
             :disabled="!selectedAccount || !selectedAlbum || albumArticles.length === 0 || batchDownloadLoading"
             @click="doBatchDownload"
@@ -64,7 +62,7 @@
               <span v-if="batchDownloadPhase === '打包'">{{ batchPackedCount }}/{{ batchDownloadedCount }}</span>
             </span>
             <span v-else>批量下载</span>
-          </UButton>
+          </ElButton>
         </div>
       </header>
 

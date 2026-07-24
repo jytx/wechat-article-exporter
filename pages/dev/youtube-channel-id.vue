@@ -2,18 +2,18 @@
   <div class="p-2 mx-auto container">
     <p class="flex justify-between">
       <span>频道地址: </span>
-      <UBadge>有效地址: {{ validURLs.length }}</UBadge>
+      <ElTag>有效地址: {{ validURLs.length }}</ElTag>
     </p>
-    <UTextarea class="my-2" v-model="url" placeholder="请输入youtube频道地址,每行一个" autoresize />
-    <UButton class="px-5" @click="submit" :loading="btnLoading" :disabled="validURLs.length === 0">{{
+    <ElInput type="textarea" class="my-2" v-model="url" placeholder="请输入youtube频道地址,每行一个" autosize />
+    <ElButton class="px-5" @click="submit" :loading="btnLoading" :disabled="validURLs.length === 0">{{
       btnLoading ? '提取中' : '提取'
-    }}</UButton>
+    }}</ElButton>
 
     <p class="mt-10 flex justify-between">
       <span>提取结果:</span>
-      <UBadge>有效频道ID: {{ channelIDs.length }}</UBadge>
+      <ElTag>有效频道ID: {{ channelIDs.length }}</ElTag>
     </p>
-    <UTextarea class="pb-5 my-2" v-model="channelID" placeholder="频道id提取结果" readonly autoresize />
+    <ElInput type="textarea" class="pb-5 my-2" v-model="channelID" placeholder="频道id提取结果" readonly autosize />
   </div>
 </template>
 

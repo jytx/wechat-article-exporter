@@ -263,39 +263,49 @@ onMounted(async () => {
       <div class="flex-1" />
 
       <!-- 搜索框 -->
-      <UInput
+      <ElInput
         v-model="searchKeyword"
         placeholder="搜索标题或摘要..."
-        icon="i-lucide:search"
         class="w-48"
-      />
+      >
+        <template #prefix>
+          <UIcon name="i-lucide:search" />
+        </template>
+      </ElInput>
 
       <!-- 时间范围 -->
       <div class="flex items-center gap-2">
         <span class="text-sm text-gray-500">时间</span>
-        <USelectMenu
+        <ElSelect
           v-model="selectedDays"
-          :options="dayOptions"
-          option-attribute="label"
-          value-attribute="value"
           class="w-28"
-        />
+        >
+          <ElOption
+            v-for="item in dayOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
       </div>
 
       <!-- 公众号筛选 -->
       <div class="flex items-center gap-2">
         <span class="text-sm text-gray-500">公众号</span>
-        <USelectMenu
+        <ElSelect
           v-model="selectedFakeids"
-          :options="allAccounts"
-          option-attribute="nickname"
-          value-attribute="fakeid"
           multiple
-          searchable
-          searchable-attribute="nickname"
+          filterable
           placeholder="全部"
           class="w-48"
-        />
+        >
+          <ElOption
+            v-for="account in allAccounts"
+            :key="account.fakeid"
+            :label="account.nickname"
+            :value="account.fakeid"
+          />
+        </ElSelect>
       </div>
     </div>
 
@@ -357,12 +367,12 @@ onMounted(async () => {
           共 {{ totalArticles }} 条，第 {{ currentPage }} / {{ totalPages }} 页
         </div>
         <div class="flex items-center gap-2">
-          <UButton
-            icon="i-heroicons-chevron-left"
+          <ElButton
             :disabled="currentPage <= 1"
             @click="goToPage(currentPage - 1)"
-          />
-          <UInput
+            ><template #icon><UIcon name="i-heroicons-chevron-left" /></template></ElButton
+          >
+          <ElInput
             v-model.number="inputPage"
             type="number"
             :min="1"
@@ -372,11 +382,11 @@ onMounted(async () => {
             @blur="handlePageInput"
           />
           <span class="text-sm text-gray-600 dark:text-gray-400">/ {{ totalPages }}</span>
-          <UButton
-            icon="i-heroicons-chevron-right"
+          <ElButton
             :disabled="currentPage >= totalPages"
             @click="goToPage(currentPage + 1)"
-          />
+            ><template #icon><UIcon name="i-heroicons-chevron-right" /></template></ElButton
+          >
           <select
             v-model.number="pageSize"
             class="text-sm border border-gray-300 dark:border-gray-700 rounded px-2 py-1 bg-transparent ml-2"

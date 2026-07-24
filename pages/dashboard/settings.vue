@@ -7,13 +7,13 @@
     <div class="flex flex-col h-full">
       <!-- 顶部操作区 -->
       <header class="flex items-center justify-end gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-        <UButton
+        <ElButton
           :loading="saving"
           :disabled="saving"
-          color="primary"
-          icon="i-lucide:save"
+          type="primary"
           @click="saveAll"
-        >{{ saving ? '保存中...' : '保存全部' }}</UButton>
+          ><template #icon><UIcon name="i-lucide:save" /></template>{{ saving ? '保存中...' : '保存全部' }}</ElButton
+        >
       </header>
 
       <div class="flex-1 overflow-auto">

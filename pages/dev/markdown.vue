@@ -13,14 +13,16 @@
             </div>
             <div class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4">
               <div class="flex gap-3 my-2">
-                <UInput
+                <ElInput
                   placeholder="请输入缓存文章的URL"
                   class="flex-1"
                   v-model="url"
-                  icon="i-lucide:link"
-                  color="gray"
-                />
-                <UButton :loading="loading" :disabled="btnDisabled" @click="loadCacheHtml" color="gray">加载</UButton>
+                >
+                  <template #prefix>
+                    <UIcon name="i-lucide:link" />
+                  </template>
+                </ElInput>
+                <ElButton :loading="loading" :disabled="btnDisabled" @click="loadCacheHtml">加载</ElButton>
               </div>
             </div>
             <div>

@@ -99,10 +99,10 @@ const progressText = computed(() => {
 
     <!-- 增量同步：只显示 spinning + 停止按钮 -->
     <template v-else-if="isActive && progress?.incremental">
-      <UButton color="green" size="xs" variant="solid" @click="stop">
+      <ElButton type="success" size="small" @click="stop">
         <Loader :size="12" class="animate-spin" />
         停止
-      </UButton>
+      </ElButton>
     </template>
 
     <!-- 全量同步：页数进度 + 新增数 + 停止按钮 -->
@@ -111,20 +111,20 @@ const progressText = computed(() => {
         <span class="text-xs text-gray-500 whitespace-nowrap font-mono">
           {{ progressText || '...' }}
         </span>
-        <UButton color="green" size="xs" variant="solid" @click="stop">
+        <ElButton type="success" size="small" @click="stop">
           <Loader :size="12" class="animate-spin" />
-        </UButton>
+        </ElButton>
       </div>
     </template>
 
     <!-- 空闲：同步按钮 -->
-    <UButton
+    <ElButton
       v-else
-      icon="i-heroicons:arrow-path-rounded-square-20-solid"
-      color="blue"
-      size="xs"
+      type="primary"
+      size="small"
       :disabled="isDisabled"
       @click="sync"
-    ></UButton>
+      ><template #icon><UIcon name="i-heroicons:arrow-path-rounded-square-20-solid" /></template></ElButton
+    >
   </div>
 </template>

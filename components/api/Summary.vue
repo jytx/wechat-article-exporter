@@ -36,7 +36,7 @@ async function getAuthKey() {
     </p>
     <p class="text-rose-500 font-medium mt-1">如果你的调用量比较大的话，推荐进行私有部署。</p>
 
-    <UAlert class="mt-10 mb-3">
+    <ElAlert class="mt-10 mb-3" type="info" :closable="false">
       <template #title>
         <h3 class="font-medium text-xl flex items-center space-x-2">
           <UIcon name="i-lucide:key-square" />
@@ -44,40 +44,38 @@ async function getAuthKey() {
         </h3>
       </template>
 
-      <template #description>
-        <ol class="list-decimal pl-5 text-base">
-          <!--          <li>-->
-          <!--            <p>-->
-          <!--              由于微信公众号本身的限制，密钥有效期最长为 4 天，且只能通过-->
-          <!--              <span class="text-rose-500 font-medium">微信扫码</span> 获取。-->
-          <!--            </p>-->
-          <!--          </li>-->
-          <li>
-            <p>以下所有 <code>API</code> 如无特殊说明，均需要携带密钥进行调用。密钥可通过以下两种方式传输：</p>
-            <p>a. 通过自定义请求头 <code class="text-rose-500 font-medium font-mono">X-Auth-Key</code></p>
-            <p>b. 通过 name 为 <code class="text-rose-500 font-medium font-mono">auth-key</code> 的 Cookie</p>
-          </li>
-          <li>
-            <p>
-              <span
-                >调用 API 的密钥与本网站的登录已集成在一起，也就是说，你在该网站扫码登录之后会自动刷新 API 密钥。</span
-              >
-            </p>
-          </li>
-          <li>
-            <p>
-              <span>由于该密钥与网站用的同一套体系，网站的登录信息失效时，对应的 API 密钥也将失效。</span>
-            </p>
-          </li>
-        </ol>
-        <UButton class="mt-3" color="blue" :loading="loading" @click="getAuthKey">
-          查询 API 密钥 (确保当前登录信息有效)
-        </UButton>
-        <div v-if="authKey">
-          <p class="mt-5 mb-2">当前密钥:</p>
-          <CodeSegment :code="authKey" lang="text" class="max-w-xl" />
-        </div>
-      </template>
-    </UAlert>
+      <ol class="list-decimal pl-5 text-base">
+        <!--          <li>-->
+        <!--            <p>-->
+        <!--              由于微信公众号本身的限制，密钥有效期最长为 4 天，且只能通过-->
+        <!--              <span class="text-rose-500 font-medium">微信扫码</span> 获取。-->
+        <!--            </p>-->
+        <!--          </li>-->
+        <li>
+          <p>以下所有 <code>API</code> 如无特殊说明，均需要携带密钥进行调用。密钥可通过以下两种方式传输：</p>
+          <p>a. 通过自定义请求头 <code class="text-rose-500 font-medium font-mono">X-Auth-Key</code></p>
+          <p>b. 通过 name 为 <code class="text-rose-500 font-medium font-mono">auth-key</code> 的 Cookie</p>
+        </li>
+        <li>
+          <p>
+            <span
+              >调用 API 的密钥与本网站的登录已集成在一起，也就是说，你在该网站扫码登录之后会自动刷新 API 密钥。</span
+            >
+          </p>
+        </li>
+        <li>
+          <p>
+            <span>由于该密钥与网站用的同一套体系，网站的登录信息失效时，对应的 API 密钥也将失效。</span>
+          </p>
+        </li>
+      </ol>
+      <ElButton class="mt-3" type="primary" :loading="loading" @click="getAuthKey">
+        查询 API 密钥 (确保当前登录信息有效)
+      </ElButton>
+      <div v-if="authKey">
+        <p class="mt-5 mb-2">当前密钥:</p>
+        <CodeSegment :code="authKey" lang="text" class="max-w-xl" />
+      </div>
+    </ElAlert>
   </div>
 </template>

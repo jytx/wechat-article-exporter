@@ -2,23 +2,17 @@
   <div class="px-2">
     <!-- 搜索输入框 -->
     <div class="relative">
-      <UInput
+      <ElInput
         v-model="searchQuery"
         placeholder="搜索公众号名称或微信号..."
-        size="md"
-        color="gray"
         @keyup.enter="handleSearch"
       >
-        <template #trailing>
-          <UButton
-            icon="i-lucide:search"
-            size="md"
-            color="gray"
-            variant="ghost"
-            @click="handleSearch"
-          />
+        <template #suffix>
+          <ElButton text @click="handleSearch"
+            ><template #icon><UIcon name="i-lucide:search" /></template></ElButton
+          >
         </template>
-      </UInput>
+      </ElInput>
 
       <!-- 清除按钮 -->
       <button

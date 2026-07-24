@@ -19,18 +19,20 @@ function preview() {
 
 <template>
   <div class="flex items-center justify-center">
-    <UTooltip text="访问原文" :popper="{ placement: 'top' }">
-      <UButton icon="i-lucide:external-link" color="blue" square variant="ghost" @click="gotoLink" />
-    </UTooltip>
-    <UTooltip text="预览" :popper="{ placement: 'top' }">
-      <UButton
+    <ElTooltip content="访问原文" placement="top">
+      <ElButton type="primary" circle text @click="gotoLink"
+        ><template #icon><UIcon name="i-lucide:external-link" /></template></ElButton
+      >
+    </ElTooltip>
+    <ElTooltip content="预览" placement="top">
+      <ElButton
+        type="primary"
+        circle
+        text
         :disabled="!params.data.contentDownload || params.data.downloading"
-        icon="i-heroicons:fire-16-solid"
-        :color="params.data.contentDownload ? 'blue' : 'rose'"
-        square
-        variant="ghost"
         @click="preview"
-      />
-    </UTooltip>
+        ><template #icon><UIcon name="i-heroicons:fire-16-solid" /></template></ElButton
+      >
+    </ElTooltip>
   </div>
 </template>

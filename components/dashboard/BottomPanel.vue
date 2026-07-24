@@ -109,24 +109,23 @@ onUnmounted(() => {
           alt=""
           class="rounded-full size-10 ring-1 ring-gray-300"
         />
-        <UTooltip
+        <ElTooltip
           v-if="loginAccount.nickname"
           class="flex-1 overflow-hidden"
-          :popper="{ placement: 'top-start', offsetDistance: 16 }"
+          placement="top-start"
         >
-          <template #text>
+          <template #content>
             <span>{{ loginAccount.nickname }}</span>
           </template>
           <span class="whitespace-nowrap text-ellipsis overflow-hidden">{{ loginAccount.nickname }}</span>
-        </UTooltip>
+        </ElTooltip>
 
-        <UButton
-          icon="i-heroicons-arrow-left-start-on-rectangle-16-solid"
+        <ElButton
           :loading="logoutBtnLoading"
           class="bg-slate-10 hover:bg-rose-500 disabled:bg-rose-500"
           @click="logout"
-          >退出
-        </UButton>
+          ><template #icon><UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" /></template>退出
+        </ElButton>
       </div>
       <div class="text-sm">
         <span>登录信息过期时间还剩: </span>
@@ -134,7 +133,7 @@ onUnmounted(() => {
       </div>
     </div>
     <div v-else>
-      <UButton color="gray" variant="solid" @click="login">登录公众号</UButton>
+      <ElButton @click="login">登录公众号</ElButton>
     </div>
     <StorageUsage />
   </footer>

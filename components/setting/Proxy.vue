@@ -1,5 +1,5 @@
 <template>
-  <UCard>
+  <ElCard>
     <template #header>
       <h3 class="text-2xl font-semibold">代理节点</h3>
       <p class="text-sm text-slate-10 font-serif">
@@ -36,11 +36,11 @@
         </div>
         <div class="mt-5">
           <label class="block text-sm mb-1">代理认证密钥（可选）</label>
-          <UInput v-model="authorizationValue" class="font-mono w-full" placeholder="若代理需要鉴权才填，如 deno deploy 的 token" />
+          <ElInput v-model="authorizationValue" class="font-mono w-full" placeholder="若代理需要鉴权才填，如 deno deploy 的 token" />
         </div>
       </div>
     </div>
-  </UCard>
+  </ElCard>
 </template>
 
 <script setup lang="ts">

@@ -1,6 +1,6 @@
 <template>
   <!-- 搜索抽屉 -->
-  <USlideover v-model="isOpen" side="left" :ui="{ overlay: { background: 'bg-zinc-400/75' } }">
+  <ElDrawer v-model="isOpen" direction="ltr" size="384px">
     <div
       ref="scrollContainerRef"
       class="w-96 rounded-lg divide-y divide-gray-100 dark:divide-gray-800 shadow bg-white dark:bg-gray-900 flex flex-col flex-1 overflow-y-scroll"
@@ -31,16 +31,14 @@
                 {{ article.account_nickname || '未知公众号' }}
               </p>
               <!-- 预览按钮：点击预览（不选中），阻止冒泡避免触发 selectArticle -->
-              <UButton
-                icon="i-lucide:eye"
-                size="xs"
-                color="gray"
-                variant="ghost"
-                :padded="false"
+              <ElButton
+                size="small"
+                text
                 class="opacity-0 group-hover:opacity-100"
                 title="预览文章内容"
                 @click.stop="previewArticle(article)"
-              />
+                ><template #icon><UIcon name="i-lucide:eye" /></template></ElButton
+              >
             </div>
             <p v-if="article.digest" class="text-gray-400 text-xs line-clamp-2">{{ article.digest }}</p>
           </li>
@@ -57,7 +55,7 @@
         </p>
       </div>
     </div>
-  </USlideover>
+  </ElDrawer>
 
   <!-- 预览面板（固定定位，独立于 USlideover，避免事件连锁导致搜索抽屉一起关闭） -->
   <Teleport to="body">
@@ -72,16 +70,16 @@
           <span v-else>{{ previewTitle }}</span>
         </h3>
         <div class="flex items-center gap-1 flex-shrink-0">
-          <UButton
-            icon="i-lucide:external-link"
-            size="xs"
-            color="gray"
-            variant="ghost"
-            :to="previewUrl"
-            target="_blank"
+          <ElButton
+            size="small"
+            text
+            @click="window.open(previewUrl, '_blank')"
             title="在新标签页打开原文"
-          />
-          <UButton icon="i-lucide:x" size="xs" color="gray" variant="ghost" @click="isPreviewOpen = false" title="关闭预览" />
+            ><template #icon><UIcon name="i-lucide:external-link" /></template></ElButton
+          >
+          <ElButton size="small" text @click="isPreviewOpen = false" title="关闭预览"
+            ><template #icon><UIcon name="i-lucide:x" /></template></ElButton
+          >
         </div>
       </div>
       <!-- 内容区 -->
@@ -92,7 +90,7 @@
         <div v-else-if="previewError" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 gap-2 p-8 text-center">
           <p>预览失败</p>
           <p class="text-xs text-gray-400">{{ previewError }}</p>
-          <UButton :to="previewUrl" target="_blank" size="xs" color="blue" variant="soft" class="mt-2">在新标签页打开原文</UButton>
+          <ElButton size="small" type="primary" plain class="mt-2" @click="window.open(previewUrl, '_blank')">在新标签页打开原文</ElButton>
         </div>
         <iframe
           v-else-if="previewHtml"

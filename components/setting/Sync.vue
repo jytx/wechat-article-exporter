@@ -1,5 +1,5 @@
 <template>
-  <UCard>
+  <ElCard>
     <template #header>
       <h3 class="text-2xl font-semibold">文章同步</h3>
       <p class="text-sm text-slate-10 font-serif">公众号文章的同步频率与定时任务配置</p>
@@ -10,17 +10,17 @@
       <div>
         <p class="mb-2 flex items-center gap-1">
           <span class="text-sm">同步频率：</span>
-          <UPopover mode="hover" :popper="{ placement: 'top' }">
-            <template #panel>
-              <p class="max-w-[300px] p-3 text-sm text-gray-500">
-                每翻一页文章列表后的等待秒数，用于防止请求过快被微信限流。<br />
-                推荐范围 3-10 秒。小于 3 秒容易触发风控，大于 10 秒会导致多公众号批量同步非常慢。
-              </p>
+          <ElPopover trigger="hover" placement="top">
+            <p class="max-w-[300px] p-3 text-sm text-gray-500">
+              每翻一页文章列表后的等待秒数，用于防止请求过快被微信限流。<br />
+              推荐范围 3-10 秒。小于 3 秒容易触发风控，大于 10 秒会导致多公众号批量同步非常慢。
+            </p>
+            <template #reference>
+              <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
             </template>
-            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
-          </UPopover>
+          </ElPopover>
         </p>
-        <UInput
+        <ElInput
           type="number"
           v-model="preferences.accountSyncSeconds"
           placeholder="3-10"
@@ -28,10 +28,10 @@
           :min="1"
           :max="60"
         >
-          <template #trailing>
+          <template #suffix>
             <span class="text-gray-500 dark:text-gray-400 text-xs">秒</span>
           </template>
-        </UInput>
+        </ElInput>
         <p v-if="syncSecondsWarning" class="mt-1 text-xs text-orange-500">{{ syncSecondsWarning }}</p>
       </div>
 
@@ -45,19 +45,23 @@
           <span class="text-sm text-blue-500 font-medium">{{ getActualDateRange() }}</span>
         </p>
         <div class="flex gap-3">
-          <USelectMenu
+          <ElSelect
             class="w-1/2"
             v-model="preferences.syncDateRange"
-            :options="DURATION_OPTIONS"
-            value-attribute="value"
-            option-attribute="label"
-          />
-          <UPopover v-if="preferences.syncDateRange === 'point'" :popper="{ placement: 'bottom-start' }">
-            <UButton color="gray" icon="i-heroicons:calendar-days-20-solid" :label="formatDate()" />
-            <template #panel="{ close }">
-              <BaseDatePicker v-model="preferences.syncDatePoint" is-required @close="close" />
+          >
+            <ElOption
+              v-for="item in DURATION_OPTIONS"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </ElSelect>
+          <ElPopover v-if="preferences.syncDateRange === 'point'" v-model:visible="datePopoverVisible" placement="bottom-start">
+            <template #reference>
+              <ElButton><template #icon><UIcon name="i-heroicons:calendar-days-20-solid" /></template>{{ formatDate() }}</ElButton>
             </template>
-          </UPopover>
+            <BaseDatePicker v-model="preferences.syncDatePoint" is-required @close="datePopoverVisible = false" />
+          </ElPopover>
         </div>
       </div>
 
@@ -74,25 +78,25 @@
 
         <div class="flex flex-col gap-3">
           <div class="flex items-center gap-2">
-            <UCheckbox
+            <ElCheckbox
               v-model="syncSchedule.enabled"
               name="autoSyncEnabled"
-              label="启用定时自动同步"
-            />
-            <UPopover mode="hover" :popper="{ placement: 'top' }">
-              <template #panel>
-                <p class="max-w-[320px] p-3 text-sm text-gray-500">
-                  勾选后，服务运行期间会按设置的 cron 定时自动同步所有公众号的最新文章。<br />
-                  需要保持服务运行，且至少有过一次扫码登录（登录态过期后需重新扫码）。
-                </p>
+              >启用定时自动同步</ElCheckbox
+            >
+            <ElPopover trigger="hover" placement="top">
+              <p class="max-w-[320px] p-3 text-sm text-gray-500">
+                勾选后，服务运行期间会按设置的 cron 定时自动同步所有公众号的最新文章。<br />
+                需要保持服务运行，且至少有过一次扫码登录（登录态过期后需重新扫码）。
+              </p>
+              <template #reference>
+                <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
               </template>
-              <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
-            </UPopover>
+            </ElPopover>
           </div>
 
           <div class="flex items-center gap-2">
             <span class="text-sm w-20">Cron 表达式</span>
-            <UInput
+            <ElInput
               v-model="syncSchedule.cron"
               placeholder="0 3 * * *"
               class="w-52 font-mono"
@@ -114,7 +118,7 @@
         </div>
       </div>
     </div>
-  </UCard>
+  </ElCard>
 </template>
 
 <script setup lang="ts">
@@ -126,6 +130,8 @@ const toast = toastFactory();
 const { getActualDateRange, getSelectOptions } = useSyncDeadline();
 const preferences: Ref<Preferences> = usePreferences() as unknown as Ref<Preferences>;
 const DURATION_OPTIONS = getSelectOptions();
+
+const datePopoverVisible = ref(false);
 
 function formatDate() {
   return dayjs.unix(preferences.value.syncDatePoint).format('YYYY-MM-DD');

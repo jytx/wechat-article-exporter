@@ -54,8 +54,8 @@ function onCancelClick() {
     <div v-if="description" class="px-5 pb-5">{{ description }}</div>
 
     <div class="flex justify-end space-x-3 px-5 py-3 border-t border-gray-100">
-      <UButton color="white" class="px-3" @click="onCancelClick">取消</UButton>
-      <UButton color="rose" class="px-3" @click="onConfirmClick">确定</UButton>
+      <ElButton class="px-3" @click="onCancelClick">取消</ElButton>
+      <ElButton type="danger" class="px-3" @click="onConfirmClick">确定</ElButton>
     </div>
   </div>
 </template>

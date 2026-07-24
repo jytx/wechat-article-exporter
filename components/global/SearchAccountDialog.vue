@@ -1,5 +1,5 @@
 <template>
-  <USlideover v-model="isOpen" side="left" :ui="{ overlay: { background: 'bg-zinc-400/75' } }">
+  <ElDrawer v-model="isOpen" direction="ltr">
     <div
       class="rounded-lg divide-y divide-gray-100 dark:divide-gray-800 shadow bg-white dark:bg-gray-900 flex flex-col flex-1 overflow-y-scroll"
     >
@@ -42,7 +42,7 @@
         </button>
       </div>
     </div>
-  </USlideover>
+  </ElDrawer>
 </template>
 
 <script setup lang="ts">

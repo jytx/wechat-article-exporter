@@ -8,29 +8,28 @@
       <!-- 顶部操作区：类型筛选 + 刷新 -->
       <header class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <div class="flex items-center gap-2">
-          <UButton
+          <ElButton
             v-for="tab in TABS"
             :key="tab.value"
-            size="xs"
-            :color="activeType === tab.value ? 'primary' : 'gray'"
-            :variant="activeType === tab.value ? 'solid' : 'ghost'"
+            size="small"
+            type="primary"
+            text
             @click="switchType(tab.value)"
           >
             {{ tab.label }}
-          </UButton>
+          </ElButton>
           <span v-if="!loading" class="text-xs text-gray-400 ml-2">
             共 {{ logLines.length }} 条
           </span>
         </div>
-        <UButton
-          size="xs"
-          color="gray"
-          icon="i-lucide:refresh-cw"
+        <ElButton
+          size="small"
           :loading="loading"
           @click="loadLogs"
         >
+          <template #icon><UIcon name="i-lucide:refresh-cw" /></template>
           刷新
-        </UButton>
+        </ElButton>
       </header>
 
       <!-- 日志主体 -->

@@ -1,9 +1,21 @@
 <template>
-  <UDropdown :items="items" :popper="{ placement: 'bottom-start' }">
+  <ElDropdown placement="bottom-start" @command="(cmd: string) => emit(cmd)">
     <slot>
-      <UButton color="white" label="导出" trailing-icon="i-heroicons-chevron-down-20-solid" />
+      <ElButton label="导出" />
     </slot>
-  </UDropdown>
+    <template #dropdown>
+      <ElDropdownMenu>
+        <ElDropdownItem
+          v-for="item in props.items"
+          :key="item.event"
+          :command="item.event"
+          :disabled="item.disabled"
+        >
+          {{ item.label }}
+        </ElDropdownItem>
+      </ElDropdownMenu>
+    </template>
+  </ElDropdown>
 </template>
 
 <script setup lang="ts">
@@ -19,14 +31,4 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const items = [
-  props.items.map(item => ({
-    label: item.label,
-    click() {
-      emit(item.event);
-    },
-    disabled: item.disabled,
-  })),
-];
 </script>
