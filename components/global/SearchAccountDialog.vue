@@ -1,5 +1,5 @@
 <template>
-  <ElDrawer v-model="isOpen" direction="ltr" size="400px">
+  <ElDrawer v-model="isOpen" direction="ltr" size="400px" :body-style="{ padding: '0', marginBottom: '0' }">
     <template #header>
       <h3 class="text-lg font-semibold">添加公众号</h3>
     </template>

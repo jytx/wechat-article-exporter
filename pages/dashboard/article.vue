@@ -958,17 +958,17 @@ function copyWechatLink() {
             @click="currentPage > 1 && (currentPage--, setPage(currentPage), refresh())"
             ><template #icon><UIcon name="i-heroicons-chevron-left" /></template></ElButton
           >
-          <div class="flex items-center gap-1">
+          <div class="flex items-center gap-1 flex-nowrap">
             <ElInput
               type="number"
               v-model="inputPage"
               :min="1"
               :max="pagination.totalPages"
-              class="w-16 text-center"
+              style="width: 64px; flex-shrink: 0"
               @keyup.enter="handlePageInput"
               @blur="handlePageInput"
             />
-            <span class="text-sm text-gray-600 dark:text-gray-400">/ {{ pagination.totalPages }}</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">/ {{ pagination.totalPages }}</span>
           </div>
           <ElButton
             :disabled="currentPage === pagination.totalPages"

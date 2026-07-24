@@ -640,7 +640,7 @@
 
 	    <div class="flex flex-col h-full divide-y divide-gray-200">
 	      <!-- 顶部操作区 -->
-	      <header class="flex items-stretch gap-3 px-3 py-3">
+	      <header class="flex flex-wrap items-center gap-3 px-3 py-3">
 	        <ElButton type="primary" :disabled="isDeleting || addBtnLoading" @click="addAccount">
 	          <template #icon><UIcon name="i-lucide:user-plus" /></template>{{ addBtnLoading ? '添加中...' : '添加' }}
 	        </ElButton>
@@ -717,7 +717,7 @@
 	      </div>
 
       <!-- 数据表格 -->
-      <div class="flex-1 overflow-hidden p-2">
+      <div class="flex-1 min-h-0 overflow-hidden p-2">
         <ElTable
           ref="tableRef"
           :data="globalRowData"
