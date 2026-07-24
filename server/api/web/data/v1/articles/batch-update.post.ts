@@ -5,6 +5,7 @@
 
 import { markArticleAsDownloaded, updateArticleDeletedStatus } from '~/server/database/article';
 import { successResponse, createApiError, ErrorCodes, validateParams } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface BatchUpdateBody {
   keys: string[];
@@ -53,7 +54,7 @@ export default defineEventHandler(async (event) => {
           else failCount++;
         }
       } catch (error) {
-        console.error(`批量更新失败 [${key}]:`, error);
+        log.error(`批量更新失败 [${key}]:`, error);
         failCount++;
       }
     }
@@ -69,7 +70,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('批量更新失败:', error);
+    log.error('批量更新失败:', error);
     throw createError({
       statusCode: 500,
       message: '批量更新失败'

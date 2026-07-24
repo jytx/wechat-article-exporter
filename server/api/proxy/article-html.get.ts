@@ -31,7 +31,7 @@ export default defineEventHandler(async event => {
         const customHeaders = JSON.parse(query.headers as string);
         headers = { ...headers, ...customHeaders };
       } catch (e) {
-        console.warn('解析 headers 失败:', e);
+        log.warn('解析 headers 失败:', e);
       }
     }
 
@@ -61,7 +61,7 @@ export default defineEventHandler(async event => {
       },
     });
   } catch (error: any) {
-    console.error('代理请求失败:', error);
+    log.error('代理请求失败:', error);
     throw createError({
       statusCode: 500,
       message: error.message || '代理请求失败',

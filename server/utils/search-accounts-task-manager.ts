@@ -10,6 +10,7 @@
 import { cookieStore } from '~/server/utils/CookieStore';
 import { saveAccount } from '~/server/database/account';
 import { USER_AGENT } from '~/config';
+import { log } from '~/server/utils/log';
 
 export interface SearchedAccount {
   keyword: string;
@@ -171,7 +172,7 @@ async function runSearchLoop(
     task.message = `失败：${msg}`;
     task.finishedAt = Date.now();
     task.updatedAt = Date.now();
-    console.error(`[search-accounts ${taskId}] 失败: ${msg}`);
+    log.error(`[search-accounts ${taskId}] 失败: ${msg}`);
   };
 
   const touch = (message?: string) => {
@@ -189,7 +190,7 @@ async function runSearchLoop(
       return;
     }
 
-    console.log(`[search-accounts ${taskId}] 开始搜索 ${params.keywords.length} 个关键词`);
+    log.info(`[search-accounts ${taskId}] 开始搜索 ${params.keywords.length} 个关键词`);
 
     for (let i = 0; i < params.keywords.length; i++) {
       const keyword = params.keywords[i].trim();
@@ -230,7 +231,7 @@ async function runSearchLoop(
           fail(`搜索了 ${task.done} 个后 session 过期`);
           return;
         }
-        console.warn(`[search-accounts ${taskId}] "${keyword}" 搜索失败: ${msg}`);
+        log.warn(`[search-accounts ${taskId}] "${keyword}" 搜索失败: ${msg}`);
       }
 
       // 间隔防限流
@@ -244,7 +245,7 @@ async function runSearchLoop(
     task.message = `完成：共搜 ${task.total} 个关键词，找到 ${task.found} 个公众号${params.autoSave ? `，入库 ${task.saved} 个` : ''}`;
     task.finishedAt = Date.now();
     task.updatedAt = Date.now();
-    console.log(`[search-accounts ${taskId}] 完成，找到 ${task.found}/${task.total}`);
+    log.info(`[search-accounts ${taskId}] 完成，找到 ${task.found}/${task.total}`);
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
   }

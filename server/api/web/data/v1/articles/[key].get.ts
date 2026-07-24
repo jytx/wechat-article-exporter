@@ -5,6 +5,7 @@
 
 import { getArticle } from '~/server/database/article';
 import { successResponse, createApiError, ErrorCodes } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -27,7 +28,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('获取文章详情失败:', error);
+    log.error('获取文章详情失败:', error);
     throw createError({
       statusCode: 500,
       message: '获取文章详情失败'

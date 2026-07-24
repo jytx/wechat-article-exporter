@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { USER_AGENT } from '~/config';
 import { getCookieFromStore } from '~/server/utils/CookieStore';
+import { log } from '~/server/utils/log';
 
 interface ResolveUrlQuery {
   url: string;
@@ -40,11 +41,11 @@ export default defineEventHandler(async event => {
   }
 
   try {
-    console.log('[resolve-url] 开始解析链接:', url);
+    log.info('[resolve-url] 开始解析链接:', url);
 
     // 从 CookieStore 获取登录后的 Cookie
     const wechatCookie = await getCookieFromStore(event);
-    console.log('[resolve-url] 从 CookieStore 获取到的 Cookie 长度:', wechatCookie?.length || 0);
+    log.info('[resolve-url] 从 CookieStore 获取到的 Cookie 长度:', wechatCookie?.length || 0);
 
     const headers: Record<string, string> = {
       Referer: 'https://mp.weixin.qq.com/',
@@ -55,7 +56,7 @@ export default defineEventHandler(async event => {
     // 如果有登录后的 Cookie，使用它
     if (wechatCookie) {
       headers.Cookie = wechatCookie;
-      console.log('[resolve-url] 使用登录后的 Cookie 访问短链接');
+      log.info('[resolve-url] 使用登录后的 Cookie 访问短链接');
     }
 
     const response = await fetch(url, {
@@ -65,7 +66,7 @@ export default defineEventHandler(async event => {
 
     // 首先检查最终 URL
     const finalUrl = response.url;
-    console.log('[resolve-url] 重定向后的 URL:', finalUrl);
+    log.info('[resolve-url] 重定向后的 URL:', finalUrl);
 
     // 如果重定向后的 URL 包含完整参数，直接返回
     if (finalUrl.includes('__biz=')) {
@@ -74,7 +75,7 @@ export default defineEventHandler(async event => {
       const appmsgid = urlObj.searchParams.get('mid');
       const itemidx = urlObj.searchParams.get('idx');
 
-      console.log('[resolve-url] ✅ 从重定向 URL 提取参数:', { fakeid, appmsgid, itemidx });
+      log.info('[resolve-url] ✅ 从重定向 URL 提取参数:', { fakeid, appmsgid, itemidx });
 
       if (fakeid && appmsgid && itemidx) {
         return {
@@ -92,17 +93,17 @@ export default defineEventHandler(async event => {
     }
 
     // 如果重定向没有完整参数，解析 HTML
-    console.log('[resolve-url] 重定向 URL 无完整参数，解析 HTML');
+    log.info('[resolve-url] 重定向 URL 无完整参数，解析 HTML');
     const rawHtml = await response.text();
-    console.log('[resolve-url] HTML 长度:', rawHtml.length);
+    log.info('[resolve-url] HTML 长度:', rawHtml.length);
 
     const $ = cheerio.load(rawHtml);
 
     // 从 meta 标签提取（最可靠的方法）
     const ogUrl = $('meta[property="og:url"]').attr('content');
     const ogTitle = $('meta[property="og:title"]').attr('content') || '';
-    console.log('[resolve-url] og:url:', ogUrl);
-    console.log('[resolve-url] og:title:', ogTitle);
+    log.info('[resolve-url] og:url:', ogUrl);
+    log.info('[resolve-url] og:title:', ogTitle);
 
     if (ogUrl && ogUrl.includes('__biz=')) {
       const urlObj = new URL(ogUrl);
@@ -110,7 +111,7 @@ export default defineEventHandler(async event => {
       const appmsgid = urlObj.searchParams.get('mid');
       const itemidx = urlObj.searchParams.get('idx');
 
-      console.log('[resolve-url] ✅ 从 meta 标签提取参数:', { fakeid, appmsgid, itemidx, title: ogTitle });
+      log.info('[resolve-url] ✅ 从 meta 标签提取参数:', { fakeid, appmsgid, itemidx, title: ogTitle });
 
       if (fakeid && appmsgid && itemidx) {
         return {
@@ -129,7 +130,7 @@ export default defineEventHandler(async event => {
 
     // 如果 meta 标签也没有，尝试从 canonical 链接提取
     const canonicalUrl = $('link[rel="canonical"]').attr('href');
-    console.log('[resolve-url] canonical URL:', canonicalUrl);
+    log.info('[resolve-url] canonical URL:', canonicalUrl);
 
     if (canonicalUrl && canonicalUrl.includes('__biz=')) {
       const urlObj = new URL(canonicalUrl);
@@ -137,7 +138,7 @@ export default defineEventHandler(async event => {
       const appmsgid = urlObj.searchParams.get('mid');
       const itemidx = urlObj.searchParams.get('idx');
 
-      console.log('[resolve-url] ✅ 从 canonical 提取参数:', { fakeid, appmsgid, itemidx });
+      log.info('[resolve-url] ✅ 从 canonical 提取参数:', { fakeid, appmsgid, itemidx });
 
       if (fakeid && appmsgid && itemidx) {
         return {
@@ -155,12 +156,12 @@ export default defineEventHandler(async event => {
     }
 
     // 尝试从 HTML 中直接搜索 __biz 参数
-    console.log('[resolve-url] 在 HTML 中搜索 __biz 参数');
+    log.info('[resolve-url] 在 HTML 中搜索 __biz 参数');
 
     // 策略1: 尝试从 window.cgiData 中提取（最可靠）
     const cgiDataMatch = rawHtml.match(/window\.cgiData\s*=\s*({[\s\S]*?});?\s*<\/script>/);
     if (cgiDataMatch) {
-      console.log('[resolve-url] 找到 window.cgiData');
+      log.info('[resolve-url] 找到 window.cgiData');
       try {
         // 清理可能的JSON问题
         const jsonStr = cgiDataMatch[1].replace(/:\s*undefined/g, ':null');
@@ -171,7 +172,7 @@ export default defineEventHandler(async event => {
           const appmsgid = cgiData.appmsgid || cgiData.mid || cgiData.appMsgInfo?.appId || '';
           const itemidx = cgiData.itemidx || cgiData.idx || cgiData.appMsgInfo?.itemIdx || 1;
 
-          console.log('[resolve-url] ✅ 从 cgiData 提取参数:', { fakeid, appmsgid, itemidx });
+          log.info('[resolve-url] ✅ 从 cgiData 提取参数:', { fakeid, appmsgid, itemidx });
 
           if (fakeid && appmsgid) {
             return {
@@ -188,13 +189,13 @@ export default defineEventHandler(async event => {
           }
         }
       } catch (e) {
-        console.log('[resolve-url] 解析 cgiData 失败:', e.message);
+        log.info('[resolve-url] 解析 cgiData 失败:', e.message);
       }
     }
 
     // 策略2: 在整个 HTML 中搜索 __biz= 格式
     const allBizMatches = rawHtml.match(/__biz=(?:")?([^&"'\s${}]+)(?:")?/g) || [];
-    console.log('[resolve-url] 找到的所有 __biz 候选:', allBizMatches.slice(0, 10));
+    log.info('[resolve-url] 找到的所有 __biz 候选:', allBizMatches.slice(0, 10));
 
     // 从候选值中直接解析参数（最可靠的方法）
     // 候选值格式如：__biz=MzU2MTI4MjI0MQ==\x26amp;mid=2247542848\x26amp;idx=1
@@ -223,7 +224,7 @@ export default defineEventHandler(async event => {
           fakeid = bizValue[1];
           appmsgid = midInMatch[1];
           itemidx = idxInMatch[1];
-          console.log('[resolve-url] ✅ 从候选值直接解析成功:', { fakeid, appmsgid, itemidx });
+          log.info('[resolve-url] ✅ 从候选值直接解析成功:', { fakeid, appmsgid, itemidx });
           break;
         }
       }
@@ -240,7 +241,7 @@ export default defineEventHandler(async event => {
           !value.includes('(')
         ) {
           fakeid = value;
-          console.log('[resolve-url] ✅ 找到有效的 fakeid:', fakeid);
+          log.info('[resolve-url] ✅ 找到有效的 fakeid:', fakeid);
           break;
         }
       }
@@ -257,11 +258,11 @@ export default defineEventHandler(async event => {
       itemidx = idxMatch?.[1] || idxMatch2?.[1] || '';
     }
 
-    console.log('[resolve-url] 最终参数:', { fakeid, appmsgid, itemidx });
+    log.info('[resolve-url] 最终参数:', { fakeid, appmsgid, itemidx });
 
     if (fakeid && appmsgid && itemidx) {
       const fullUrl = `https://mp.weixin.qq.com/s?__biz=${fakeid}&mid=${appmsgid}&idx=${itemidx}`;
-      console.log('[resolve-url] ✅ 提取参数成功:', fullUrl);
+      log.info('[resolve-url] ✅ 提取参数成功:', fullUrl);
       return {
         success: true,
         data: {
@@ -276,7 +277,7 @@ export default defineEventHandler(async event => {
     }
 
     // 尝试从 script 标签中直接提取参数（使用正则匹配，不使用 JSON.parse）
-    console.log('[resolve-url] 尝试从 script 标签提取参数');
+    log.info('[resolve-url] 尝试从 script 标签提取参数');
     let foundParams: any = null;
 
     $('script').each((i, el) => {
@@ -294,7 +295,7 @@ export default defineEventHandler(async event => {
           appmsgid: Number(midMatch[1]),
           itemidx: Number(idxMatch[1]),
         };
-        console.log('[resolve-url] ✅ 从 script 提取参数:', foundParams);
+        log.info('[resolve-url] ✅ 从 script 提取参数:', foundParams);
       }
     });
 
@@ -313,15 +314,15 @@ export default defineEventHandler(async event => {
       };
     }
 
-    console.error('[resolve-url] ❌ 无法解析完整文章参数');
-    console.error('[resolve-url] 原始 URL:', url);
-    console.error('[resolve-url] 重定向 URL:', finalUrl);
-    console.error('[resolve-url] og:url:', ogUrl);
-    console.error('[resolve-url] og:title:', ogTitle);
+    log.error('[resolve-url] ❌ 无法解析完整文章参数');
+    log.error('[resolve-url] 原始 URL:', url);
+    log.error('[resolve-url] 重定向 URL:', finalUrl);
+    log.error('[resolve-url] og:url:', ogUrl);
+    log.error('[resolve-url] og:title:', ogTitle);
 
     // 即使无法解析完整参数，至少返回标题（部分成功）
     if (ogTitle) {
-      console.log('[resolve-url] ⚠️ 部分成功：至少提取到标题');
+      log.info('[resolve-url] ⚠️ 部分成功：至少提取到标题');
       return {
         success: true,
         data: {
@@ -341,7 +342,7 @@ export default defineEventHandler(async event => {
       message: '无法解析文章链接，请使用标准的文章链接格式',
     });
   } catch (error: any) {
-    console.error('[resolve-url] ❌ 解析失败:', error);
+    log.error('[resolve-url] ❌ 解析失败:', error);
     throw createError({
       statusCode: error.statusCode || 500,
       message: error.message || '解析链接失败',

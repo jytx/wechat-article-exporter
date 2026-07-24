@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
     };
 
   } catch (error) {
-    console.error('开始迁移失败:', error);
+    log.error('开始迁移失败:', error);
     throw createError({
       statusCode: 500,
       message: '开始迁移失败'

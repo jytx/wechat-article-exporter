@@ -6,6 +6,7 @@
  */
 import { saveAccount } from '~/server/database/account';
 import { getCookieFromStore } from '~/server/utils/CookieStore';
+import { log } from '~/server/utils/log';
 
 interface SyncAccountBody {
   fakeid: string;
@@ -66,7 +67,7 @@ export default defineEventHandler(async event => {
       data: accountData,
     };
   } catch (error) {
-    console.error('Failed to sync account:', error);
+    log.error('Failed to sync account:', error);
     throw error;
   }
 });

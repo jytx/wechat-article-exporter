@@ -32,6 +32,9 @@
 
           <!-- 消息通知 -->
           <SettingNotification ref="notificationRef" />
+
+          <!-- 文章订阅 -->
+          <SettingSubscription ref="subscriptionRef" />
         </div>
       </div>
     </div>
@@ -49,6 +52,8 @@ const preferences = usePreferences() as unknown as Ref<Preferences>;
 const saving = ref(false);
 /** 消息通知组件引用（调用其 save 方法保存通知配置） */
 const notificationRef = ref<{ save: () => Promise<boolean> } | null>(null);
+/** 文章订阅组件引用（调用其 save 方法保存订阅配置） */
+const subscriptionRef = ref<{ save: () => Promise<boolean> } | null>(null);
 
 async function saveAll() {
   saving.value = true;
@@ -99,6 +104,16 @@ async function saveAll() {
   // 3. 保存消息通知配置（Notification 组件）
   if (notificationRef.value) {
     const ok = await notificationRef.value.save();
+    if (ok) {
+      okCount++;
+    } else {
+      failCount++;
+    }
+  }
+
+  // 4. 保存文章订阅配置（Subscription 组件）
+  if (subscriptionRef.value) {
+    const ok = await subscriptionRef.value.save();
     if (ok) {
       okCount++;
     } else {

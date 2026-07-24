@@ -3,6 +3,7 @@
  * GET /api/skill/accounts/:fakeid
  */
 import { getAccount } from '~/server/database/account';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -27,7 +28,7 @@ export default defineEventHandler(async (event) => {
       data: account,
     };
   } catch (error) {
-    console.error('Failed to get account:', error);
+    log.error('Failed to get account:', error);
     throw error;
   }
 });

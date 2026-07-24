@@ -17,6 +17,7 @@ import { getAuthKeyFromRequest } from '~/server/utils/proxy-request';
 import { getAccount } from '~/server/database/account';
 import { startSyncTask, getActiveTasks } from '~/server/utils/sync-task-manager';
 import { successResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface SyncAccountBody {
   fakeid: string;
@@ -65,7 +66,7 @@ export default defineEventHandler(async event => {
     incremental: body.incremental,
   });
 
-  console.log(`[sync-account] 已启动后台任务 ${taskId}，公众号 ${nickname}`);
+  log.info(`[sync-account] 已启动后台任务 ${taskId}，公众号 ${nickname}`);
 
   return successResponse(
     { taskId, fakeid: body.fakeid, nickname },

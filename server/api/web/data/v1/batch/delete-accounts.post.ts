@@ -6,6 +6,7 @@
 import { deleteAccount, getAccount } from '~/server/database/account';
 import { deleteArticlesByFakeid } from '~/server/database/article';
 import { successResponse, validateParams, ErrorCodes, createApiError } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface DeleteAccountsBody {
   fakeids: string[];
@@ -76,7 +77,7 @@ export default defineEventHandler(async (event) => {
         }
 
       } catch (error) {
-        console.error(`删除公众号失败 [${fakeid}]:`, error);
+        log.error(`删除公众号失败 [${fakeid}]:`, error);
         errors.push({
           fakeid,
           error: error instanceof Error ? error.message : '未知错误'
@@ -98,7 +99,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('批量删除公众号失败:', error);
+    log.error('批量删除公众号失败:', error);
     throw createError({
       statusCode: 500,
       message: '批量删除公众号失败'

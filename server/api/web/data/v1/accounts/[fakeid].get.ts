@@ -6,6 +6,7 @@
 import { getAccount } from '~/server/database/account';
 import { getArticlesByFakeid } from '~/server/database/article';
 import { createApiError, ErrorCodes, successResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   try {
@@ -45,7 +46,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('获取公众号详情失败:', error);
+    log.error('获取公众号详情失败:', error);
     throw createError({
       statusCode: 500,
       message: '获取公众号详情失败',

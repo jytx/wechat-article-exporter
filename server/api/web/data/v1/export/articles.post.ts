@@ -6,6 +6,7 @@
 import { promises as fs } from 'fs';
 import { createError } from 'h3';
 import path from 'path';
+import { log } from '~/server/utils/log';
 
 interface ExportArticleItem {
   url: string;
@@ -23,15 +24,15 @@ interface ExportRequest {
 
 export default defineEventHandler(async event => {
   try {
-    console.log('开始处理导出请求...');
+    log.info('开始处理导出请求...');
 
     // 读取请求体
     let body: ExportRequest;
     try {
       body = await readBody<ExportRequest>(event);
-      console.log('请求体:', JSON.stringify(body, null, 2));
+      log.info('请求体:', JSON.stringify(body, null, 2));
     } catch (readError) {
-      console.error('读取请求体失败:', readError);
+      log.error('读取请求体失败:', readError);
       throw createError({
         statusCode: 400,
         message: `请求体格式错误: ${readError instanceof Error ? readError.message : '未知错误'}`,
@@ -40,7 +41,7 @@ export default defineEventHandler(async event => {
 
     const { articles, format, exportPath } = body;
 
-    console.log('解析后的参数 - articles 数量:', articles?.length, 'format:', format, 'exportPath:', exportPath);
+    log.info('解析后的参数 - articles 数量:', articles?.length, 'format:', format, 'exportPath:', exportPath);
 
     if (!articles || articles.length === 0) {
       throw createError({
@@ -67,27 +68,27 @@ export default defineEventHandler(async event => {
     // 导出每篇文章
     for (const article of articles) {
       try {
-        console.log('开始处理文章:', JSON.stringify(article, null, 2));
+        log.info('开始处理文章:', JSON.stringify(article, null, 2));
 
         // 验证并获取公众号名称和标题（提供默认值）
         const accountName = article.accountName || '未知公众号';
         const title = article.title || `untitled_${Date.now()}`;
 
-        console.log('accountName:', accountName, 'title:', title);
+        log.info('accountName:', accountName, 'title:', title);
 
         // 创建公众号子目录
         const sanitizedAccountName = filterInvalidFilenameChars(String(accountName));
-        console.log('sanitizedAccountName:', sanitizedAccountName);
-        console.log('targetPath:', targetPath);
+        log.info('sanitizedAccountName:', sanitizedAccountName);
+        log.info('targetPath:', targetPath);
 
         const accountDir = path.join(targetPath, sanitizedAccountName);
-        console.log('accountDir:', accountDir);
+        log.info('accountDir:', accountDir);
 
         await fs.mkdir(accountDir, { recursive: true });
 
         // 生成文件名
         const sanitizedTitle = filterInvalidFilenameChars(String(title));
-        console.log('sanitizedTitle:', sanitizedTitle);
+        log.info('sanitizedTitle:', sanitizedTitle);
         const filename = sanitizedTitle;
         let filePath: string;
         let content: string;
@@ -119,7 +120,7 @@ export default defineEventHandler(async event => {
           path: filePath,
         });
       } catch (error) {
-        console.error(`导出文章失败: ${article.title}`, error);
+        log.error(`导出文章失败: ${article.title}`, error);
         results.push({
           url: article.url,
           title: article.title,
@@ -139,7 +140,7 @@ export default defineEventHandler(async event => {
       },
     };
   } catch (error) {
-    console.error('导出文章失败:', error);
+    log.error('导出文章失败:', error);
     throw createError({
       statusCode: 500,
       message: `导出文章失败: ${error instanceof Error ? error.message : '未知错误'}`,

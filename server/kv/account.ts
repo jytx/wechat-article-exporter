@@ -45,7 +45,7 @@ export async function saveAccount(account: MpAccountKV): Promise<boolean> {
     }
     return true;
   } catch (err) {
-    console.error('saveAccount failed:', err);
+    log.error('saveAccount failed:', err);
     return false;
   }
 }
@@ -58,7 +58,7 @@ export async function getAccount(fakeid: string): Promise<MpAccountKV | null> {
   try {
     return await kv.get<MpAccountKV>(`account:${fakeid}`);
   } catch (err) {
-    console.error('getAccount failed:', err);
+    log.error('getAccount failed:', err);
     return null;
   }
 }
@@ -83,7 +83,7 @@ export async function getAllAccounts(): Promise<MpAccountKV[]> {
     // 按更新时间排序
     return accounts.sort((a, b) => b.update_time - a.update_time);
   } catch (err) {
-    console.error('getAllAccounts failed:', err);
+    log.error('getAllAccounts failed:', err);
     return [];
   }
 }
@@ -97,7 +97,7 @@ export async function deleteAccount(fakeid: string): Promise<boolean> {
     await kv.remove(`account:${fakeid}`);
     return true;
   } catch (err) {
-    console.error('deleteAccount failed:', err);
+    log.error('deleteAccount failed:', err);
     return false;
   }
 }
@@ -117,7 +117,7 @@ export async function updateAccountTotalCount(fakeid: string, totalCount: number
     }
     return false;
   } catch (err) {
-    console.error('updateAccountTotalCount failed:', err);
+    log.error('updateAccountTotalCount failed:', err);
     return false;
   }
 }
@@ -137,7 +137,7 @@ export async function updateAccountSyncedCount(fakeid: string, count: number): P
     }
     return false;
   } catch (err) {
-    console.error('updateAccountSyncedCount failed:', err);
+    log.error('updateAccountSyncedCount failed:', err);
     return false;
   }
 }

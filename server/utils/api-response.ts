@@ -148,7 +148,7 @@ export function createApiError(
  * 处理 API 错误
  */
 export function handleApiError(error: any) {
-  console.error('API 错误:', error);
+  log.error('API 错误:', error);
 
   // 如果是已知的 API 错误，直接抛出
   if (error.code) {

@@ -3,6 +3,7 @@
  */
 
 import { getDatabase } from '~/server/utils/database';
+import { log } from '~/server/utils/log';
 
 export interface User {
   id: number;
@@ -42,7 +43,7 @@ export function getUserByToken(token: string): User | null {
     const stmt = db.prepare('SELECT * FROM users WHERE token = ?');
     return stmt.get(token) as User | null;
   } catch (error) {
-    console.error('getUserByToken failed:', error);
+    log.error('getUserByToken failed:', error);
     return null;
   }
 }
@@ -56,7 +57,7 @@ export function getUserByUsername(username: string): User | null {
     const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
     return stmt.get(username) as User | null;
   } catch (error) {
-    console.error('getUserByUsername failed:', error);
+    log.error('getUserByUsername failed:', error);
     return null;
   }
 }
@@ -74,7 +75,7 @@ export function createUser(username: string, password: string, token: string): b
     stmt.run(username, password, token);
     return true;
   } catch (error) {
-    console.error('createUser failed:', error);
+    log.error('createUser failed:', error);
     return false;
   }
 }
@@ -93,7 +94,7 @@ export function updateUserToken(userId: number, token: string): boolean {
     stmt.run(token, userId);
     return true;
   } catch (error) {
-    console.error('updateUserToken failed:', error);
+    log.error('updateUserToken failed:', error);
     return false;
   }
 }
@@ -107,7 +108,7 @@ export function getAllUsers(): User[] {
     const stmt = db.prepare('SELECT * FROM users ORDER BY created_at DESC');
     return stmt.all() as User[];
   } catch (error) {
-    console.error('getAllUsers failed:', error);
+    log.error('getAllUsers failed:', error);
     return [];
   }
 }

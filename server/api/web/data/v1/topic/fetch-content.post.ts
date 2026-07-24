@@ -12,6 +12,7 @@
 import { startContentFetchTask, getActiveContentFetchTasks } from '~/server/utils/content-fetch-task-manager';
 import { getAllSettings } from '~/server/database/settings';
 import { successResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   const body = await readBody<{ days?: number; limit?: number }>(event).catch(() => ({}));
@@ -39,6 +40,6 @@ export default defineEventHandler(async event => {
   }
 
   const taskId = startContentFetchTask(days, limit);
-  console.log(`[fetch-content] 已启动补抓任务 ${taskId}（days=${days}, limit=${limit}，直连模式）`);
+  log.info(`[fetch-content] 已启动补抓任务 ${taskId}（days=${days}, limit=${limit}，直连模式）`);
   return successResponse({ taskId }, '正文补抓已开始');
 });

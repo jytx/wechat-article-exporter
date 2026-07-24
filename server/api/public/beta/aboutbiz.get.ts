@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import * as cheerio from 'cheerio';
 import { isDev } from '~/config';
+import { log } from '~/server/utils/log';
 
 interface AboutBizQuery {
   fakeid: string;
@@ -87,8 +88,8 @@ function extractInfo(rawHTML: string) {
     } else if (title === '客服电话') {
       result.phone = $itemInfo.find('.item-desc').text().trim();
     } else {
-      console.log(`title: <${title}>`);
-      console.log($itemInfo.text());
+      log.info(`title: <${title}>`);
+      log.info($itemInfo.text());
     }
 
     $itemInfo = $itemInfo.next('.item-info');
@@ -105,7 +106,7 @@ function extractInfo(rawHTML: string) {
     try {
       eval(scriptCode);
     } catch (e) {
-      console.error('eval execute js code fatal:', e);
+      log.error('eval execute js code fatal:', e);
     }
     if (window.ip_wording) {
       result.ip_wording = window.ip_wording;

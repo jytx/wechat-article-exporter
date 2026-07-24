@@ -9,6 +9,7 @@
 
 import { randomUUID } from 'uncrypto';
 import { createUser, getUserByToken, getUserByUsername, updateUserToken } from '~/server/database/user';
+import { log } from '~/server/utils/log';
 
 interface LoginBody {
   username: string;
@@ -123,7 +124,7 @@ export default defineEventHandler(async event => {
     }
 
     // 未知错误
-    console.error('登录失败:', error);
+    log.error('登录失败:', error);
     throw createError({
       statusCode: 500,
       message: '登录失败，请稍后重试',

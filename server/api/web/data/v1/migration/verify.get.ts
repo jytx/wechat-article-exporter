@@ -5,6 +5,7 @@
 
 import { getAllAccounts } from '~/server/database/account';
 import { getAllArticlesByFakeid } from '~/server/database/article';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -48,7 +49,7 @@ export default defineEventHandler(async (event) => {
     };
 
   } catch (error) {
-    console.error('验证数据失败:', error);
+    log.error('验证数据失败:', error);
     throw createError({
       statusCode: 500,
       message: '验证数据失败'

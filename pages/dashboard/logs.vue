@@ -55,14 +55,15 @@ import { websiteName } from '~/config';
 const TABS: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'sync', label: '同步' },
-  { value: 'schedule', label: '定时任务' },
+  { value: 'schedule', label: '定时同步' },
+  { value: 'subscription', label: '订阅推送' },
   { value: 'other', label: '其他' },
 ];
 
 /** 单条日志的结构 */
 interface LogLine {
   raw: string;
-  type: 'sync' | 'schedule' | 'other';
+  type: 'sync' | 'schedule' | 'subscription' | 'other';
   level: 'info' | 'warn' | 'error';
 }
 

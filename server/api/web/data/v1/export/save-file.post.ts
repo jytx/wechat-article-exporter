@@ -6,6 +6,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { createError } from 'h3';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -49,7 +50,7 @@ export default defineEventHandler(async (event) => {
     };
 
   } catch (error) {
-    console.error('保存导出文件失败:', error);
+    log.error('保存导出文件失败:', error);
     throw createError({
       statusCode: 500,
       message: `保存导出文件失败: ${error instanceof Error ? error.message : '未知错误'}`

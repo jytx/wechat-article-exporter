@@ -3,6 +3,7 @@
  */
 
 import { getDatabase } from '~/server/utils/database';
+import { log } from '~/server/utils/log';
 
 export interface Article {
   id?: number;
@@ -60,7 +61,7 @@ export async function saveArticle(article: Article): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('saveArticle failed:', error);
+    log.error('saveArticle failed:', error);
     return false;
   }
 }
@@ -112,7 +113,7 @@ export async function saveArticles(articles: Article[]): Promise<number> {
 
     return Math.max(0, after.c - before.c); // 真正新增的数量
   } catch (error) {
-    console.error('saveArticles failed:', error);
+    log.error('saveArticles failed:', error);
     return 0;
   }
 }
@@ -127,7 +128,7 @@ export async function getArticle(key: string): Promise<Article | null> {
     const row = stmt.get(key) as any;
     return row || null;
   } catch (error) {
-    console.error('getArticle failed:', error);
+    log.error('getArticle failed:', error);
     return null;
   }
 }
@@ -142,7 +143,7 @@ export async function getArticleByUrl(url: string): Promise<Article | null> {
     const row = stmt.get(url) as any;
     return row || null;
   } catch (error) {
-    console.error('getArticleByUrl failed:', error);
+    log.error('getArticleByUrl failed:', error);
     return null;
   }
 }
@@ -205,7 +206,7 @@ export async function getArticlesByFakeid(
 
     return { items, total };
   } catch (error) {
-    console.error('getArticlesByFakeid failed:', error);
+    log.error('getArticlesByFakeid failed:', error);
     return { items: [], total: 0 };
   }
 }
@@ -226,7 +227,7 @@ export async function getArticlesByFakeids(fakeids: string[]): Promise<Article[]
     `);
     return stmt.all(...fakeids) as Article[];
   } catch (error) {
-    console.error('getArticlesByFakeids failed:', error);
+    log.error('getArticlesByFakeids failed:', error);
     return [];
   }
 }
@@ -245,7 +246,7 @@ export async function updateArticleDownloaded(key: string, downloaded: boolean):
     stmt.run(downloaded ? 1 : 0, key);
     return true;
   } catch (error) {
-    console.error('updateArticleDownloaded failed:', error);
+    log.error('updateArticleDownloaded failed:', error);
     return false;
   }
 }
@@ -273,7 +274,7 @@ export async function updateArticlesDownloaded(keys: string[], downloaded: boole
     updateMany(keys);
     return count;
   } catch (error) {
-    console.error('updateArticlesDownloaded failed:', error);
+    log.error('updateArticlesDownloaded failed:', error);
     return 0;
   }
 }
@@ -288,7 +289,7 @@ export async function softDeleteArticle(key: string): Promise<boolean> {
     stmt.run(key);
     return true;
   } catch (error) {
-    console.error('softDeleteArticle failed:', error);
+    log.error('softDeleteArticle failed:', error);
     return false;
   }
 }
@@ -303,7 +304,7 @@ export async function softDeleteArticlesByFakeid(fakeid: string): Promise<number
     const result = stmt.run(fakeid);
     return result.changes;
   } catch (error) {
-    console.error('softDeleteArticlesByFakeid failed:', error);
+    log.error('softDeleteArticlesByFakeid failed:', error);
     return 0;
   }
 }
@@ -318,7 +319,7 @@ export async function deleteArticle(key: string): Promise<boolean> {
     stmt.run(key);
     return true;
   } catch (error) {
-    console.error('deleteArticle failed:', error);
+    log.error('deleteArticle failed:', error);
     return false;
   }
 }
@@ -333,7 +334,7 @@ export async function deleteArticlesByFakeid(fakeid: string): Promise<number> {
     const result = stmt.run(fakeid);
     return result.changes;
   } catch (error) {
-    console.error('deleteArticlesByFakeid failed:', error);
+    log.error('deleteArticlesByFakeid failed:', error);
     return 0;
   }
 }
@@ -367,7 +368,7 @@ export async function getArticleStats(fakeid: string): Promise<{
       pending: totalResult.count - downloadedResult.count,
     };
   } catch (error) {
-    console.error('getArticleStats failed:', error);
+    log.error('getArticleStats failed:', error);
     return { total: 0, downloaded: 0, pending: 0 };
   }
 }
@@ -379,7 +380,7 @@ export async function markArticleAsDownloaded(key: string, downloadedAt?: string
   try {
     return await updateArticleDownloaded(key, true);
   } catch (error) {
-    console.error('markArticleAsDownloaded failed:', error);
+    log.error('markArticleAsDownloaded failed:', error);
     return false;
   }
 }
@@ -392,7 +393,7 @@ export async function getUndownloadedArticles(fakeid: string): Promise<Article[]
     const result = await getArticlesByFakeid(fakeid, { downloaded: false });
     return result.items;
   } catch (error) {
-    console.error('getUndownloadedArticles failed:', error);
+    log.error('getUndownloadedArticles failed:', error);
     return [];
   }
 }
@@ -406,7 +407,7 @@ export async function getAllArticlesByFakeid(fakeid: string): Promise<Article[]>
     // 按创建时间倒序排序
     return result.items.sort((a, b) => (b.create_time || 0) - (a.create_time || 0));
   } catch (error) {
-    console.error('getAllArticlesByFakeid failed:', error);
+    log.error('getAllArticlesByFakeid failed:', error);
     return [];
   }
 }
@@ -442,7 +443,44 @@ export async function getRecentArticlesForTopic(limit = 50, days = 0): Promise<A
       )
       .all(...params) as Article[];
   } catch (error) {
-    console.error('getRecentArticlesForTopic failed:', error);
+    log.error('getRecentArticlesForTopic failed:', error);
+    return [];
+  }
+}
+
+/**
+ * 查询指定时间戳之后的新文章（用于订阅推送）。
+ *
+ * 按 timeField 过滤：
+ * - 'created_at'（入库时间）：确保每篇文章只被推送一次，调高频率也不会重复
+ * - 'create_time'（发布时间）：只推最近 N 天发布的文章，不受同步时间影响
+ *
+ * @param afterTimestamp 秒级时间戳
+ * @param limit          最多返回条数
+ * @param timeField      判断新旧的时间字段，默认 created_at
+ */
+export async function getArticlesAfterTimestamp(
+  afterTimestamp: number,
+  limit: number = 200,
+  timeField: 'created_at' | 'create_time' = 'created_at',
+): Promise<Article[]> {
+  try {
+    const db = getDatabase();
+    const safeLimit = Math.max(1, Math.min(500, limit));
+    const field = timeField === 'create_time' ? 'a.create_time' : 'a.created_at';
+
+    return db
+      .prepare(
+        `SELECT a.*, acc.nickname AS account_nickname, acc.alias AS account_alias
+         FROM articles a
+         LEFT JOIN accounts acc ON a.fakeid = acc.fakeid
+         WHERE a.is_deleted = 0 AND ${field} > ?
+         ORDER BY ${field} ASC
+         LIMIT ?`
+      )
+      .all(afterTimestamp, safeLimit) as Article[];
+  } catch (error) {
+    log.error('getArticlesAfterTimestamp failed:', error);
     return [];
   }
 }
@@ -461,7 +499,7 @@ export async function updateArticleDeletedStatus(key: string, isDeleted: boolean
     stmt.run(isDeleted ? 1 : 0, key);
     return true;
   } catch (error) {
-    console.error('updateArticleDeletedStatus failed:', error);
+    log.error('updateArticleDeletedStatus failed:', error);
     return false;
   }
 }

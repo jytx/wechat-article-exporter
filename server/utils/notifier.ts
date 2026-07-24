@@ -64,13 +64,15 @@ export function saveNotificationConfig(config: NotificationConfig): boolean {
  * 发送 SMTP 邮件（纯函数）。
  * @param config SMTP 配置
  * @param subject 邮件主题
- * @param body   邮件正文（纯文本）
+ * @param body   邮件正文（纯文本，作为不支持 HTML 的客户端的降级）
+ * @param html   邮件正文（HTML 富文本，可选，传入后客户端优先渲染 HTML）
  * @returns 成功返回 true，失败返回 Error 对象
  */
 export async function sendEmail(
   config: EmailConfig,
   subject: string,
   body: string,
+  html?: string,
 ): Promise<true | Error> {
   if (!config.host || !config.user || !config.pass || !config.to) {
     return new Error('SMTP 配置不完整（缺少 host/user/pass/to）');
@@ -89,6 +91,7 @@ export async function sendEmail(
       to: config.to,
       subject,
       text: body,
+      ...(html ? { html } : {}),
     });
     return true;
   } catch (e) {
@@ -126,6 +129,10 @@ function buildWebhookPayload(type: WebhookType, title: string, content: string):
  * @param title   消息标题
  * @param content 消息正文
  * @returns 成功返回 true，失败返回 Error 对象
+ *
+ * 注意：飞书/企业微信的 HTTP 状态码永远是 200，真正的成功/失败在响应体 JSON 的 code 字段里。
+ * code=0 表示成功，其他值（如 19021 频率限制、19024 IP 不可用等）表示失败。
+ * 只看 HTTP 状态码会误判，必须解析响应体。
  */
 export async function sendWebhook(
   config: WebhookConfig,
@@ -144,9 +151,20 @@ export async function sendWebhook(
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(15_000),
     });
+
     if (!resp.ok) {
       return new Error(`Webhook 返回 HTTP ${resp.status}`);
     }
+
+    // 解析响应体：飞书/企微用 HTTP 200 + code 字段表示真实结果
+    const body = await resp.json() as any;
+    // 飞书：code=0 或 StatusCode=0；企业微信：errcode=0
+    const code = body.code ?? body.StatusCode ?? body.errcode;
+    if (code !== undefined && code !== 0) {
+      const msg = body.msg || body.StatusMessage || body.errmsg || '未知错误';
+      return new Error(`Webhook 平台返回错误: code=${code} msg=${msg}`);
+    }
+
     return true;
   } catch (e) {
     return e instanceof Error ? e : new Error(String(e));

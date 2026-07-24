@@ -50,7 +50,7 @@ export default defineEventHandler(async event => {
       },
     };
   } catch (error) {
-    console.error('检查登录状态失败:', error);
+    log.error('检查登录状态失败:', error);
 
     // 出错时返回未认证状态
     return {

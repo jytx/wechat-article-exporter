@@ -5,6 +5,7 @@
 
 import { updateArticleDeletedStatus } from '~/server/database/article';
 import { successResponse, createApiError, ErrorCodes } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface MarkDeletedBody {
   is_deleted: boolean;
@@ -38,7 +39,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('标记文章失败:', error);
+    log.error('标记文章失败:', error);
     throw createError({
       statusCode: 500,
       message: '标记文章失败'

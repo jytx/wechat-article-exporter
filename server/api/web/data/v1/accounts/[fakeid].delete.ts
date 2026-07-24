@@ -6,6 +6,7 @@
 import { deleteAccount, getAccount } from '~/server/database/account';
 import { deleteArticlesByFakeid } from '~/server/database/article';
 import { successResponse, createApiError, ErrorCodes } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('删除公众号失败:', error);
+    log.error('删除公众号失败:', error);
     throw createError({
       statusCode: 500,
       message: '删除公众号失败'

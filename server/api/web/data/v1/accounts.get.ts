@@ -5,6 +5,7 @@
 
 import { getAllAccounts } from '~/server/database/account';
 import { getPaginationParams, paginatedResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   try {
@@ -32,7 +33,7 @@ export default defineEventHandler(async event => {
 
     return paginatedResponse(items, total, page, pageSize);
   } catch (error) {
-    console.error('获取公众号列表失败:', error);
+    log.error('获取公众号列表失败:', error);
     throw createError({
       statusCode: 500,
       message: '获取公众号列表失败',

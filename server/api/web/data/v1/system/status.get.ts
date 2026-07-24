@@ -7,6 +7,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { getAllAccounts } from '~/server/database/account';
 import { getAllArticlesByFakeid } from '~/server/database/article';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   try {
@@ -52,7 +53,7 @@ export default defineEventHandler(async event => {
           }
         }
       } catch (error) {
-        console.error('获取存储大小失败:', error);
+        log.error('获取存储大小失败:', error);
       }
     }
 
@@ -76,7 +77,7 @@ export default defineEventHandler(async event => {
       },
     };
   } catch (error) {
-    console.error('获取系统状态失败:', error);
+    log.error('获取系统状态失败:', error);
     throw createError({
       statusCode: 500,
       message: '获取系统状态失败',

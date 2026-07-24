@@ -4,6 +4,7 @@
 
 import { getTokenFromStore } from '~/server/utils/CookieStore';
 import { proxyMpRequest } from '~/server/utils/proxy-request';
+import { log } from '~/server/utils/log';
 
 interface AppMsgPublishQuery {
   begin?: number;
@@ -49,7 +50,7 @@ export default defineEventHandler(async event => {
     query: params,
     parseJson: true,
   }).catch(e => {
-    console.error(e);
+    log.error(e);
     return {
       base_resp: {
         ret: -1,

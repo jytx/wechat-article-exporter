@@ -7,6 +7,7 @@
 
 import { updateAccountSyncedCount } from '~/server/database/account';
 import { saveArticles } from '~/server/database/article';
+import { log } from '~/server/utils/log';
 
 interface SyncArticlesBody {
   fakeid: string;
@@ -82,7 +83,7 @@ export default defineEventHandler(async event => {
       },
     };
   } catch (error) {
-    console.error('Failed to sync articles:', error);
+    log.error('Failed to sync articles:', error);
     throw error;
   }
 });

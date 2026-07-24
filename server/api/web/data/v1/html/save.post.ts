@@ -6,6 +6,7 @@
 import { saveArticleHtml } from '~/server/database/html';
 import { extractAndSaveContent } from '~/server/database/article-content';
 import { successResponse, createApiError, ErrorCodes, validateParams } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface SaveHtmlBody {
   url: string;
@@ -63,7 +64,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('保存文章内容失败:', error);
+    log.error('保存文章内容失败:', error);
     throw createError({
       statusCode: 500,
       message: '保存文章内容失败',

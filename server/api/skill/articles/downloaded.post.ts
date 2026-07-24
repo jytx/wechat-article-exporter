@@ -3,6 +3,7 @@
  * POST /api/skill/articles/downloaded
  */
 import { markArticleAsDownloaded } from '~/server/database/article';
+import { log } from '~/server/utils/log';
 
 interface DownloadedBody {
   fakeid: string;
@@ -40,7 +41,7 @@ export default defineEventHandler(async (event) => {
       message: '标记成功',
     };
   } catch (error) {
-    console.error('Failed to mark article as downloaded:', error);
+    log.error('Failed to mark article as downloaded:', error);
     throw error;
   }
 });

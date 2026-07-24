@@ -8,6 +8,7 @@
  */
 import * as cheerio from 'cheerio';
 import { successResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 const REQUEST_HEADERS: Record<string, string> = {
   'User-Agent':
@@ -100,7 +101,7 @@ export default defineEventHandler(async event => {
 
     return successResponse({ html: fullHtml });
   } catch (error: any) {
-    console.error('[preview-html] 抓取失败:', error?.message);
+    log.error('[preview-html] 抓取失败:', error?.message);
     return successResponse({ html: '', error: error?.message || '预览失败' });
   }
 });

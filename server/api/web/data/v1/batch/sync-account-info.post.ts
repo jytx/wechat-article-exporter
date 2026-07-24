@@ -14,6 +14,7 @@ import { getCookieFromStore, getTokenFromStore } from '~/server/utils/CookieStor
 import { successResponse } from '~/server/utils/api-response';
 import { getDatabase } from '~/server/utils/database';
 import { USER_AGENT } from '~/config';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   const token = await getTokenFromStore(event);
@@ -40,7 +41,7 @@ export default defineEventHandler(async event => {
   let failed = 0;
   const results: { nickname: string; ok: boolean; reason?: string }[] = [];
 
-  for (const acc of allAccounts) {
+  for (const acc of accounts) {
     try {
       // 用公众号名搜 searchbiz
       const params = new URLSearchParams({
@@ -98,19 +99,19 @@ export default defineEventHandler(async event => {
 
       updated++;
       results.push({ nickname: acc.nickname, ok: true });
-      console.log(`[sync-account-info] ${acc.nickname}: 信息已更新（头像: ${matched.round_head_img ? '有' : '无'}）`);
+      log.info(`[sync-account-info] ${acc.nickname}: 信息已更新（头像: ${matched.round_head_img ? '有' : '无'}）`);
 
       // 防限流
       await new Promise(r => setTimeout(r, 1500));
     } catch (e: any) {
       failed++;
       results.push({ nickname: acc.nickname, ok: false, reason: e?.message });
-      console.error(`[sync-account-info] ${acc.nickname} 失败:`, e?.message);
+      log.error(`[sync-account-info] ${acc.nickname} 失败:`, e?.message);
     }
   }
 
   return successResponse(
-    { updated, failed, total: allAccounts.length, results },
+    { updated, failed, total: accounts.length, results },
     `公众号信息同步完成：成功 ${updated}，失败 ${failed}`
   );
 });

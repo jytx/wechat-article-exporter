@@ -4,6 +4,7 @@
  */
 import { getArticlesByFakeid } from '~/server/database/article';
 import { getAccount } from '~/server/database/account';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -41,7 +42,7 @@ export default defineEventHandler(async (event) => {
       },
     };
   } catch (error) {
-    console.error('Failed to get articles:', error);
+    log.error('Failed to get articles:', error);
     throw error;
   }
 });

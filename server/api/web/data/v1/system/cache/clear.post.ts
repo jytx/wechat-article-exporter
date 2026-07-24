@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     };
 
   } catch (error) {
-    console.error('清除缓存失败:', error);
+    log.error('清除缓存失败:', error);
     throw createError({
       statusCode: 500,
       message: '清除缓存失败'

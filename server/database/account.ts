@@ -3,6 +3,7 @@
  */
 
 import { getDatabase } from '~/server/utils/database';
+import { log } from '~/server/utils/log';
 
 export interface MpAccount {
   fakeid: string;
@@ -42,7 +43,7 @@ export async function saveAccount(account: MpAccount): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('saveAccount failed:', error);
+    log.error('saveAccount failed:', error);
     return false;
   }
 }
@@ -57,7 +58,7 @@ export async function getAccount(fakeid: string): Promise<MpAccount | null> {
     const row = stmt.get(fakeid) as any;
     return row || null;
   } catch (error) {
-    console.error('getAccount failed:', error);
+    log.error('getAccount failed:', error);
     return null;
   }
 }
@@ -71,7 +72,7 @@ export async function getAllAccounts(): Promise<MpAccount[]> {
     const stmt = db.prepare('SELECT * FROM accounts ORDER BY create_time DESC');
     return stmt.all() as MpAccount[];
   } catch (error) {
-    console.error('getAllAccounts failed:', error);
+    log.error('getAllAccounts failed:', error);
     return [];
   }
 }
@@ -118,7 +119,7 @@ export async function getAccountsByPage(params: {
 
     return { items, total };
   } catch (error) {
-    console.error('getAccountsByPage failed:', error);
+    log.error('getAccountsByPage failed:', error);
     return { items: [], total: 0 };
   }
 }
@@ -133,7 +134,7 @@ export async function deleteAccount(fakeid: string): Promise<boolean> {
     stmt.run(fakeid);
     return true;
   } catch (error) {
-    console.error('deleteAccount failed:', error);
+    log.error('deleteAccount failed:', error);
     return false;
   }
 }
@@ -157,7 +158,7 @@ export async function deleteAccounts(fakeids: string[]): Promise<number> {
     deleteMany(fakeids);
     return count;
   } catch (error) {
-    console.error('deleteAccounts failed:', error);
+    log.error('deleteAccounts failed:', error);
     return 0;
   }
 }
@@ -176,7 +177,7 @@ export async function updateAccountTotalCount(fakeid: string, totalCount: number
     stmt.run(totalCount, fakeid);
     return true;
   } catch (error) {
-    console.error('updateAccountTotalCount failed:', error);
+    log.error('updateAccountTotalCount failed:', error);
     return false;
   }
 }
@@ -195,7 +196,7 @@ export async function updateAccountSyncedCount(fakeid: string, count: number): P
     stmt.run(count, fakeid);
     return true;
   } catch (error) {
-    console.error('updateAccountSyncedCount failed:', error);
+    log.error('updateAccountSyncedCount failed:', error);
     return false;
   }
 }
@@ -210,7 +211,7 @@ export async function accountExists(fakeid: string): Promise<boolean> {
     const result = stmt.get(fakeid);
     return !!result;
   } catch (error) {
-    console.error('accountExists failed:', error);
+    log.error('accountExists failed:', error);
     return false;
   }
 }

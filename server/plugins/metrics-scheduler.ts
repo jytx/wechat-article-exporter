@@ -14,6 +14,7 @@ import { getAllSettings, getSetting, setSetting } from '~/server/database/settin
 import { getAllAccounts } from '~/server/database/account';
 import { startSyncTask, getActiveTasks } from '~/server/utils/sync-task-manager';
 import { cookieStore } from '~/server/utils/CookieStore';
+import { log } from '~/server/utils/log';
 
 let currentJob: cron.ScheduledTask | null = null;
 
@@ -132,7 +133,7 @@ async function checkSessionValid(authKey: string): Promise<{ valid: boolean; rea
     return { valid: true, reason: '' };
   } catch (e: any) {
     // 网络异常时不判定为过期，避免误报；让后续同步任务自己处理
-    console.warn('[auto-sync] session 预检网络异常，跳过预检:', e?.message || e);
+    log.warn('[auto-sync] session 预检网络异常，跳过预检:', e?.message || e);
     return { valid: true, reason: '预检异常，按有效处理' };
   }
 }
@@ -141,13 +142,13 @@ async function checkSessionValid(authKey: string): Promise<{ valid: boolean; rea
  * 执行一次全量自动同步
  */
 async function runAutoSync() {
-  console.log('[auto-sync] 定时同步触发');
+  log.info('[auto-sync] 定时同步触发');
   // 记录本次触发时间（秒级）。启动补跑逻辑据此判断是否漏跑。
   setSetting('article_sync_last_run', String(Math.floor(Date.now() / 1000)));
 
   const authKey = getLatestAuthKey();
   if (!authKey) {
-    console.log('[auto-sync] 无有效登录态，跳过（请先扫码登录）');
+    log.info('[auto-sync] 无有效登录态，跳过（请先扫码登录）');
     setSetting(SESSION_EXPIRED_KEY, String(Math.floor(Date.now() / 1000)));
     return;
   }
@@ -158,7 +159,7 @@ async function runAutoSync() {
   if (!valid) {
     const ts = Math.floor(Date.now() / 1000);
     setSetting(SESSION_EXPIRED_KEY, String(ts));
-    console.warn(`[auto-sync] session 已过期（${reason}），定时同步暂停。请重新扫码登录。`);
+    log.warn(`[auto-sync] session 已过期（${reason}），定时同步暂停。请重新扫码登录。`);
     return;
   }
 
@@ -167,11 +168,11 @@ async function runAutoSync() {
 
   const accounts = await getAllAccounts();
   if (accounts.length === 0) {
-    console.log('[auto-sync] 无公众号，跳过');
+    log.info('[auto-sync] 无公众号，跳过');
     return;
   }
 
-  console.log(`[auto-sync] 共 ${accounts.length} 个公众号待同步`);
+  log.info(`[auto-sync] 共 ${accounts.length} 个公众号待同步`);
 
   let triggered = 0;
   for (const account of accounts) {
@@ -195,7 +196,7 @@ async function runAutoSync() {
     triggered++;
   }
 
-  console.log(`[auto-sync] 已触发 ${triggered}/${accounts.length} 个公众号的同步任务`);
+  log.info(`[auto-sync] 已触发 ${triggered}/${accounts.length} 个公众号的同步任务`);
 }
 
 /**
@@ -209,21 +210,21 @@ export function rescheduleArticleSync(enabled: boolean, cronExpr: string): boole
   }
 
   if (!enabled) {
-    console.log('[auto-sync] 已禁用定时同步');
+    log.info('[auto-sync] 已禁用定时同步');
     return true;
   }
 
   if (!cron.validate(cronExpr)) {
-    console.error(`[auto-sync] cron 表达式非法: ${cronExpr}，跳过调度`);
+    log.error(`[auto-sync] cron 表达式非法: ${cronExpr}，跳过调度`);
     return false;
   }
 
   currentJob = cron.schedule(cronExpr, () => {
-    console.log(`[auto-sync] 定时同步触发 ${new Date().toISOString()}`);
+    log.info(`[auto-sync] 定时同步触发`);
     runAutoSync();
   });
 
-  console.log(`[auto-sync] 已启用定时同步：${cronExpr}`);
+  log.info(`[auto-sync] 已启用定时同步：${cronExpr}`);
   return true;
 }
 
@@ -244,11 +245,11 @@ export default defineNitroPlugin(() => {
     const reason = !lastRun
       ? '首次启用，尚无同步记录'
       : `距上次同步已 ${Math.floor((nowSec - parseInt(lastRun, 10)) / 3600)} 小时（阈值 ${Math.floor(threshold / 3600)}h）`;
-    console.log(`[auto-sync] 启动补跑：${reason}，10 秒后触发`);
+    log.info(`[auto-sync] 启动补跑：${reason}，10 秒后触发`);
     setTimeout(() => {
       runAutoSync();
     }, 10_000);
   } else {
-    console.log(`[auto-sync] 启动检查：距上次同步未超阈值，跳过补跑`);
+    log.info(`[auto-sync] 启动检查：距上次同步未超阈值，跳过补跑`);
   }
 });

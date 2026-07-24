@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('取消迁移失败:', error);
+    log.error('取消迁移失败:', error);
     throw createError({
       statusCode: 500,
       message: '取消迁移失败'

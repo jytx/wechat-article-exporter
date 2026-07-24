@@ -20,35 +20,6 @@
           <p class="mt-2 px-3 py-2 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-md dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700">
             所有代理额度将在每天早上 8:00 刷新。
           </p>
-          <UPopover :popper="{ placement: 'left-start', arrow: true }">
-            <UButton
-              :icon="hasBlocked ? 'i-lucide:annoyed' : 'i-lucide:smile'"
-              variant="link"
-              :color="hasBlocked ? 'rose' : 'green'"
-            />
-
-            <template #panel>
-              <div class="p-4 space-y-3 max-h-80 overflow-y-scroll">
-                <div>
-                  <p>当前IP:</p>
-                  <code class="font-medium" :class="hasBlocked ? 'text-rose-500' : 'text-green-500'">
-                    {{ currentIP }}
-                  </code>
-                </div>
-                <div>
-                  <p class="flex justify-between items-center min-w-64">
-                    <span>已被封禁IP:</span>
-                    <span class="text-xs text-gray-500">若存在误伤，请联系开发者</span>
-                  </p>
-                  <ul>
-                    <li v-for="ip in blockedIPS" :key="ip">
-                      <code class="text-rose-500">{{ ip }}</code>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </template>
-          </UPopover>
         </div>
       </header>
 
@@ -100,7 +71,6 @@ async function getMetricsData() {
 }
 
 const currentIP = ref('');
-const blockedIPS = ref<string[]>([]);
 
 onMounted(async () => {
   await Promise.all([
@@ -108,12 +78,6 @@ onMounted(async () => {
     request('/api/web/misc/current-ip').then(data => {
       currentIP.value = data.ip;
     }),
-    request<{ ips: string[] } | string[]>('/api/web/worker/blocked-ip-list').then(data => {
-      blockedIPS.value = Array.isArray(data) ? data : (data.ips || []);
-    }),
   ]);
-});
-const hasBlocked = computed(() => {
-  return blockedIPS.value.includes(currentIP.value);
 });
 </script>

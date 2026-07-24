@@ -6,7 +6,7 @@
  */
 
 /** 通知事件类型 —— 决定哪些场景会触发通知 */
-export type NotificationEvent = 'syncComplete' | 'sessionExpired' | 'syncFailed';
+export type NotificationEvent = 'syncComplete' | 'sessionExpired' | 'syncFailed' | 'articleDigest';
 
 /** Webhook 平台类型 */
 export type WebhookType = 'feishu' | 'wecom' | 'custom';
@@ -46,6 +46,7 @@ export function createDefaultNotificationConfig(): NotificationConfig {
       syncComplete: false,
       sessionExpired: false,
       syncFailed: false,
+      articleDigest: false,
     },
     email: {
       enabled: false,

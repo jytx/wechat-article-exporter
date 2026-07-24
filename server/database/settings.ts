@@ -5,6 +5,7 @@
 
 import { PUBLIC_PROXY_LIST } from '~/config/public-proxy';
 import { getDatabase } from '~/server/utils/database';
+import { log } from '~/server/utils/log';
 
 export interface SettingItem {
   key: string;
@@ -46,6 +47,18 @@ const DEFAULT_SETTINGS: SettingItem[] = [
     value: JSON.stringify({
       enabled: false,
       cron: '0 3 * * *', // 默认每天凌晨3点
+    }),
+  },
+  // —— 文章订阅推送 ——
+  {
+    key: 'article_subscription',
+    value: JSON.stringify({
+      enabled: false,
+      cron: '0 9 * * *', // 默认每天早9点
+      days: 1,
+      onlyNewArticles: true,
+      maxArticles: 200,
+      timeField: 'create_time', // 默认按文章发布时间
     }),
   },
 ];
@@ -106,7 +119,7 @@ export function setSetting(key: string, value: string): boolean {
     );
     return true;
   } catch (error) {
-    console.error('setSetting failed:', error);
+    log.error('setSetting failed:', error);
     return false;
   }
 }
@@ -127,7 +140,7 @@ export function batchSetSettings(items: SettingItem[]): boolean {
     })();
     return true;
   } catch (error) {
-    console.error('batchSetSettings failed:', error);
+    log.error('batchSetSettings failed:', error);
     return false;
   }
 }

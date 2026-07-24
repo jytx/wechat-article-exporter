@@ -6,6 +6,7 @@
 import { getQuery } from 'h3';
 import { getArticleHtml } from '~/server/database/html';
 import { successResponse, createApiError, ErrorCodes } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   try {
@@ -35,7 +36,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('获取文章内容失败:', error);
+    log.error('获取文章内容失败:', error);
     throw createError({
       statusCode: 500,
       message: '获取文章内容失败',

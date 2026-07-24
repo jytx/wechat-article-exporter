@@ -14,6 +14,7 @@
 import { getAuthKeyFromRequest } from '~/server/utils/proxy-request';
 import { startSearchAccountsTask, getActiveSearchAccountsTasks } from '~/server/utils/search-accounts-task-manager';
 import { successResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface SearchBody {
   keywords: string[];
@@ -59,6 +60,6 @@ export default defineEventHandler(async event => {
     autoSave: body.autoSave !== false, // 默认 true
   });
 
-  console.log(`[search-accounts] 已启动后台任务 ${taskId}，${keywords.length} 个关键词`);
+  log.info(`[search-accounts] 已启动后台任务 ${taskId}，${keywords.length} 个关键词`);
   return successResponse({ taskId, count: keywords.length }, `开始搜索 ${keywords.length} 个公众号`);
 });

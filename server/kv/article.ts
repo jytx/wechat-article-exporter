@@ -42,7 +42,7 @@ export async function saveArticle(article: ArticleKV): Promise<boolean> {
     await kv.set(key, article);
     return true;
   } catch (err) {
-    console.error('saveArticle failed:', err);
+    log.error('saveArticle failed:', err);
     return false;
   }
 }
@@ -61,7 +61,7 @@ export async function saveArticles(articles: ArticleKV[]): Promise<number> {
     }
     return saved;
   } catch (err) {
-    console.error('saveArticles failed:', err);
+    log.error('saveArticles failed:', err);
     return saved;
   }
 }
@@ -74,7 +74,7 @@ export async function getArticle(key: string): Promise<ArticleKV | null> {
   try {
     return await kv.get<ArticleKV>(`article:${key}`);
   } catch (err) {
-    console.error('getArticle failed:', err);
+    log.error('getArticle failed:', err);
     return null;
   }
 }
@@ -111,7 +111,7 @@ export async function getArticlesByFakeid(
       articles: articles.slice(begin, begin + size),
     };
   } catch (err) {
-    console.error('getArticlesByFakeid failed:', err);
+    log.error('getArticlesByFakeid failed:', err);
     return { total: 0, articles: [] };
   }
 }
@@ -135,7 +135,7 @@ export async function getAllArticlesByFakeid(fakeid: string): Promise<ArticleKV[
     // 按创建时间倒序排序
     return articles.sort((a, b) => b.create_time - a.create_time);
   } catch (err) {
-    console.error('getAllArticlesByFakeid failed:', err);
+    log.error('getAllArticlesByFakeid failed:', err);
     return [];
   }
 }
@@ -163,7 +163,7 @@ export async function markArticleAsDownloaded(key: string, downloadedAt?: string
     }
     return false;
   } catch (err) {
-    console.error('markArticleAsDownloaded failed:', err);
+    log.error('markArticleAsDownloaded failed:', err);
     return false;
   }
 }
@@ -182,7 +182,7 @@ export async function deleteArticlesByFakeid(fakeid: string): Promise<number> {
     }
     return deleted;
   } catch (err) {
-    console.error('deleteArticlesByFakeid failed:', err);
+    log.error('deleteArticlesByFakeid failed:', err);
     return 0;
   }
 }
@@ -201,7 +201,7 @@ export async function updateArticleDeletedStatus(key: string, isDeleted: boolean
     }
     return false;
   } catch (err) {
-    console.error('updateArticleDeletedStatus failed:', err);
+    log.error('updateArticleDeletedStatus failed:', err);
     return false;
   }
 }

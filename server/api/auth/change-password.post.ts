@@ -95,7 +95,7 @@ export default defineEventHandler(async event => {
     }
 
     // 未知错误
-    console.error('修改密码失败:', error);
+    log.error('修改密码失败:', error);
     throw createError({
       statusCode: 500,
       message: '修改密码失败，请稍后重试',

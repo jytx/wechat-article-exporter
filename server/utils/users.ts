@@ -38,7 +38,7 @@ export async function verifyPassword(plainPassword: string, hashedPassword: stri
     const bcrypt = await import('bcrypt');
     return await bcrypt.compare(plainPassword, hashedPassword);
   } catch (error) {
-    console.error('密码验证失败:', error);
+    log.error('密码验证失败:', error);
     return false;
   }
 }
@@ -51,7 +51,7 @@ export async function hashPassword(password: string): Promise<string> {
     const bcrypt = await import('bcrypt');
     return await bcrypt.hash(password, 10);
   } catch (error) {
-    console.error('密码哈希失败:', error);
+    log.error('密码哈希失败:', error);
     throw error;
   }
 }

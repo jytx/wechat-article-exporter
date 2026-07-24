@@ -5,6 +5,7 @@
 import { getAllAccounts } from '~/server/database/account';
 import { getTokenFromStore } from '~/server/utils/CookieStore';
 import { proxyMpRequest } from '~/server/utils/proxy-request';
+import { log } from '~/server/utils/log';
 
 interface SearchArticleQuery {
   begin?: number;
@@ -80,17 +81,17 @@ function isValidKeyword(keyword: any): boolean {
  */
 function parseArticlesFromResponse(rawResponse: any, accountName: string): any[] {
   if (!rawResponse) {
-    console.log('[parseArticlesFromResponse] rawResponse is null');
+    log.info('[parseArticlesFromResponse] rawResponse is null');
     return [];
   }
 
   if (rawResponse.base_resp?.ret !== 0) {
-    console.log(`[parseArticlesFromResponse] base_resp.ret=${rawResponse.base_resp?.ret}, err_msg=${rawResponse.base_resp?.err_msg}`);
+    log.info(`[parseArticlesFromResponse] base_resp.ret=${rawResponse.base_resp?.ret}, err_msg=${rawResponse.base_resp?.err_msg}`);
     return [];
   }
 
   if (!rawResponse.publish_page) {
-    console.log('[parseArticlesFromResponse] no publish_page field, keys:', Object.keys(rawResponse).join(','));
+    log.info('[parseArticlesFromResponse] no publish_page field, keys:', Object.keys(rawResponse).join(','));
     return [];
   }
 
@@ -110,7 +111,7 @@ function parseArticlesFromResponse(rawResponse: any, accountName: string): any[]
         create_time_formatted: formatTimestamp(article.create_time),
       }));
   } catch (e) {
-    console.error('解析搜索结果失败:', e);
+    log.error('解析搜索结果失败:', e);
     return [];
   }
 }
@@ -149,12 +150,12 @@ async function searchArticlesInAccount(
     query: params,
     parseJson: true,
   }).catch(e => {
-    console.error(`搜索公众号 ${fakeid} 文章失败:`, e);
+    log.error(`搜索公众号 ${fakeid} 文章失败:`, e);
     return null;
   });
 
   if (res) {
-    console.log(
+    log.info(
       `[search-article-debug] fakeid=${fakeid} keyword="${keyword}" ret=${res.base_resp?.ret} err_msg=${res.base_resp?.err_msg} has_publish_page=${!!res.publish_page} keys=${Object.keys(res).join(',')}`,
     );
   }
@@ -246,14 +247,14 @@ export default defineEventHandler(async event => {
   results.forEach((res, index) => {
     const account = myAccounts[index];
     if (res) {
-      console.log(
+      log.info(
         `[search-article] account="${account?.nickname}" fakeid=${account?.fakeid} ret=${res.base_resp?.ret} has_publish_page=${!!res.publish_page}`,
       );
       const articles = parseArticlesFromResponse(res, account?.nickname || '未知公众号');
-      console.log(`[search-article] account="${account?.nickname}" parsed ${articles.length} articles`);
+      log.info(`[search-article] account="${account?.nickname}" parsed ${articles.length} articles`);
       allArticles = allArticles.concat(articles);
     } else {
-      console.log(`[search-article] account="${account?.nickname}" fakeid=${account?.fakeid} response=null`);
+      log.info(`[search-article] account="${account?.nickname}" fakeid=${account?.fakeid} response=null`);
     }
   });
 
@@ -264,7 +265,7 @@ export default defineEventHandler(async event => {
     return timeB - timeA;
   });
 
-  console.log(
+  log.info(
     `[search-article] keyword="${keyword}" accounts=${myAccounts.length} totalResults=${allArticles.length}`,
   );
 

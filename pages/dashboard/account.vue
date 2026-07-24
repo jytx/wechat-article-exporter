@@ -88,6 +88,53 @@
 	  }
 	}
 
+	// ========== URL 添加公众号 ==========
+	const urlModalOpen = ref(false);
+	const urlInput = ref('');
+	const urlAdding = ref(false);
+
+	/** 通过 URL 解析公众号信息并添加 */
+	async function addAccountByUrl() {
+	  const url = urlInput.value.trim();
+	  if (!url) return;
+	  if (!checkLogin()) return;
+
+	  urlAdding.value = true;
+	  try {
+	    const resp = await $fetch<any>('/api/web/mp/searchbyurl', {
+	      query: { url },
+		});
+
+		if (resp.base_resp?.ret !== 0) {
+		  toast.error('解析失败', resp.base_resp?.err_msg || '无法从 URL 解析公众号信息');
+		  return;
+		}
+
+		if (!resp.list || resp.list.length === 0) {
+		  toast.error('未找到', '未匹配到公众号，请检查 URL 是否正确');
+		  return;
+		}
+
+		const accountInfo = resp.list[0];
+		// 复用已有的添加逻辑
+		await onSelectAccount({
+		  fakeid: accountInfo.fakeid,
+		  nickname: accountInfo.nickname,
+		  alias: accountInfo.alias,
+		  round_head_img: accountInfo.round_head_img,
+		  signature: accountInfo.signature,
+		} as Account);
+
+		// 成功后关闭弹窗、清空输入
+		urlModalOpen.value = false;
+		urlInput.value = '';
+	  } catch (e: any) {
+	    toast.error('解析失败', e?.message || '请求失败，请重试');
+	  } finally {
+	    urlAdding.value = false;
+	  }
+	}
+
 	// 表示同步过程中是否执行了取消操作
 	const isCanceled = ref(false);
 	const isDeleting = ref(false);
@@ -102,6 +149,9 @@
 	// 每个任务的服务端状态，用于 UI 区分排队/同步中/停止中
 	// canceling 是纯前端状态：用户点了停止但服务端还没确认完成
 	const taskStatusMap = ref<Map<string, 'pending' | 'running' | 'canceling'>>(new Map());
+
+	/** 同步实时进度（fakeid → {synced, total, pages, message}），轮询时更新 */
+	const syncProgressMap = ref<Map<string, { synced: number; total: number; pages: number; incremental: boolean; message: string }>>(new Map());
 
 	// 所有正在同步/排队的公众号 fakeid 集合（用于批量显示同步状态）
 	const syncingFakeids = computed(() => new Set(activeSyncTasks.value.keys()));
@@ -147,7 +197,12 @@
 		}
 
 		if (result.alreadyRunning) {
-		  toast.info('提示', `${account.nickname} 正在同步中`);
+		  // 该公众号已在同步队列中，记录到 activeSyncTasks 让 UI 正确显示状态
+		  activeSyncTasks.value.set(account.fakeid, result.taskId);
+		  taskStatusMap.value.set(account.fakeid, 'running');
+		  isSyncing.value = true;
+		  startPolling();
+		  toast.info('提示', `${account.nickname} 已在同步队列中`);
 		  return;
 		}
 
@@ -192,6 +247,7 @@
 			if (task.status === 'completed' || task.status === 'failed') {
 			  activeSyncTasks.value.delete(fakeid);
 			  taskStatusMap.value.delete(fakeid);
+			  syncProgressMap.value.delete(fakeid);
 			  await updateRow(fakeid);
 
 			  if (task.status === 'failed') {
@@ -213,6 +269,14 @@
 			  if (current !== 'canceling') {
 			    taskStatusMap.value.set(fakeid, task.status);
 			  }
+			  // 写入实时进度（synced/total/pages），供 SyncProgress 组件展示
+			  syncProgressMap.value.set(fakeid, {
+			    synced: task.synced ?? 0,
+			    total: task.totalWx ?? 0,
+			    pages: task.pagesDone ?? 0,
+			    incremental: task.incremental ?? false,
+			    message: task.message ?? '',
+			  });
 			}
 		  } catch (e) {
 			console.warn('查询同步状态失败:', e);
@@ -286,6 +350,7 @@
 		stopPolling();
 		activeSyncTasks.value.clear();
 		taskStatusMap.value.clear();
+		syncProgressMap.value.clear();
 		syncingRowId.value = null;
 		isSyncing.value = false;
 		toast.info('已停止', '所有同步任务正在停止中');
@@ -326,12 +391,11 @@
 	  console.log(`[batch-sync] 批量同步循环结束，共启动 ${activeSyncTasks.value.size} 个任务`);
 	}
 
-	// 重新同步（全量：强制从头 begin=0 开始）
+	// 重新同步（全量：强制从头 begin=0 开始，不受时间范围限制）
 	async function resyncSelectedAccounts() {
 	  if (!checkLogin()) return;
 	  isCanceled.value = false;
 
-	  const deadline = syncToTimestamp;
 	  const rows = getSelectedRows();
 
 	  for (const account of rows) {
@@ -339,7 +403,7 @@
 	    if (isCanceled.value) break;
 	    await startBackgroundSync(account, {
 	      begin: 0,
-	      deadline: deadline > 0 ? deadline : undefined,
+	      // 全量同步不传 deadline，翻完所有历史文章
 	    });
 	  }
 	}
@@ -505,9 +569,11 @@
 	      syncingRowId: syncingRowId,
 	      syncingFakeids: syncingFakeids,
 	      taskStatusMap: taskStatusMap,
+	      syncProgressMap: syncProgressMap,
 	    },
 	    cellClass: 'flex justify-center items-center',
-	    maxWidth: 100,
+	    minWidth: 160,
+	    maxWidth: 200,
 	    pinned: 'right',
 	  },
 	]);
@@ -766,9 +832,12 @@
 	    <div class="flex flex-col h-full divide-y divide-gray-200">
 	      <!-- 顶部操作区 -->
 	      <header class="flex items-stretch gap-3 px-3 py-3">
-	        <UButton icon="i-lucide:user-plus" color="blue" :disabled="isDeleting || addBtnLoading" @click="addAccount">
-	          {{ addBtnLoading ? '添加中...' : '添加' }}
-	        </UButton>
+		        <UButton icon="i-lucide:user-plus" color="blue" :disabled="isDeleting || addBtnLoading" @click="addAccount">
+		          {{ addBtnLoading ? '添加中...' : '添加' }}
+		        </UButton>
+        <UButton icon="i-lucide:link" color="blue" :disabled="isDeleting || urlAdding" @click="urlModalOpen = true">
+		          {{ urlAdding ? '解析中...' : 'URL 添加' }}
+		        </UButton>
         <UButton icon="i-lucide:arrow-down-to-line" color="blue" :loading="importBtnLoading" @click="importAccount">
           批量导入
           <input ref="fileRef" type="file" accept=".json" class="hidden" @change="handleFileChange" />
@@ -800,7 +869,7 @@
                   icon="i-heroicons:arrow-path-rounded-square-20-solid"
                   class="disabled:opacity-35"
                   :loading="isSyncing"
-                  :disabled="isDeleting || !hasSelectedRows"
+                  :disabled="isDeleting || isSyncing || !hasSelectedRows"
                   @click="loadSelectedAccountArticle"
                   >增量同步</UButton
                 >
@@ -810,7 +879,7 @@
                   icon="i-heroicons:arrow-path"
                   class="disabled:opacity-35"
                   :loading="isSyncing"
-                  :disabled="isDeleting || !hasSelectedRows"
+                  :disabled="isDeleting || isSyncing || !hasSelectedRows"
                   @click="resyncSelectedAccounts"
                   >全量同步</UButton
                 >
@@ -859,5 +928,28 @@
 
 	    <!-- 添加公众号弹框 -->
 	    <GlobalSearchAccountDialog ref="searchAccountDialogRef" @select:account="onSelectAccount" />
+
+	    <!-- URL 添加弹框 -->
+	    <UModal v-model="urlModalOpen">
+	      <div class="p-6">
+	        <h3 class="text-lg font-semibold mb-4">通过 URL 添加公众号</h3>
+	        <UInput
+	          v-model="urlInput"
+	          placeholder="粘贴公众号主页链接或文章链接"
+	          class="w-full font-mono"
+	          autofocus
+	          @keyup.enter="addAccountByUrl"
+	        />
+	        <p class="mt-2 text-xs text-gray-400">
+	          支持公众号主页链接（profile_ext）和文章链接（mp.weixin.qq.com/s/xxx）
+	        </p>
+	        <div class="flex justify-end gap-3 mt-6">
+	          <UButton color="gray" @click="urlModalOpen = false">取消</UButton>
+	          <UButton color="primary" :loading="urlAdding" :disabled="!urlInput.trim()" @click="addAccountByUrl">
+	            解析并添加
+	          </UButton>
+	        </div>
+	      </div>
+	    </UModal>
 	  </div>
 	</template>

@@ -15,6 +15,7 @@
           <UCheckbox v-model="config.events.syncComplete" name="evSync" label="定时同步完成" />
           <UCheckbox v-model="config.events.sessionExpired" name="evSession" label="登录态过期" />
           <UCheckbox v-model="config.events.syncFailed" name="evFailed" label="同步失败告警" />
+          <UCheckbox v-model="config.events.articleDigest" name="evDigest" label="文章订阅推送" />
         </div>
       </div>
 

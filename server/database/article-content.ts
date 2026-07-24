@@ -5,6 +5,7 @@
 
 import * as cheerio from 'cheerio';
 import { getDatabase } from '~/server/utils/database';
+import { log } from '~/server/utils/log';
 
 export interface ArticleContent {
   url: string;
@@ -31,7 +32,7 @@ export async function upsertContent(c: ArticleContent): Promise<boolean> {
     `).run(c.url, c.fakeid || null, c.title || null, c.content);
     return true;
   } catch (error) {
-    console.error('upsertContent failed:', error);
+    log.error('upsertContent failed:', error);
     return false;
   }
 }
@@ -55,7 +56,7 @@ export function extractTextFromHtml(html: string): string {
     const text = raw.replace(/\s+/g, ' ').trim();
     return text.length > MAX_CONTENT_CHARS ? `${text.slice(0, MAX_CONTENT_CHARS)}…` : text;
   } catch (error) {
-    console.error('extractTextFromHtml failed:', error);
+    log.error('extractTextFromHtml failed:', error);
     return '';
   }
 }
@@ -89,7 +90,7 @@ export async function getContentByUrl(url: string): Promise<ArticleContent | nul
     const row = db.prepare('SELECT * FROM article_content WHERE url = ?').get(url) as ArticleContent | undefined;
     return row || null;
   } catch (error) {
-    console.error('getContentByUrl failed:', error);
+    log.error('getContentByUrl failed:', error);
     return null;
   }
 }
@@ -108,7 +109,7 @@ export async function getContentsByUrls(urls: string[]): Promise<Map<string, str
       .all(...urls) as { url: string; content: string }[];
     for (const r of rows) result.set(r.url, r.content);
   } catch (error) {
-    console.error('getContentsByUrls failed:', error);
+    log.error('getContentsByUrls failed:', error);
   }
   return result;
 }
@@ -140,7 +141,7 @@ export async function getArticlesMissingContent(
     params.push(safeLimit);
     return db.prepare(sql).all(...params) as { url: string; fakeid: string; title: string }[];
   } catch (error) {
-    console.error('getArticlesMissingContent failed:', error);
+    log.error('getArticlesMissingContent failed:', error);
     return [];
   }
 }
@@ -168,7 +169,7 @@ export async function getContentCoverage(days: number): Promise<{ total: number;
     const row = db.prepare(sql).get(...params) as { total: number; withContent: number | null };
     return { total: row.total || 0, withContent: row.withContent || 0 };
   } catch (error) {
-    console.error('getContentCoverage failed:', error);
+    log.error('getContentCoverage failed:', error);
     return { total: 0, withContent: 0 };
   }
 }

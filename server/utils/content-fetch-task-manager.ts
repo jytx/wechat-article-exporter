@@ -9,6 +9,7 @@
 
 import * as cheerio from 'cheerio';
 import { getArticlesMissingContent, upsertContent } from '~/server/database/article-content';
+import { log } from '~/server/utils/log';
 
 export interface ContentFetchTask {
   id: string;
@@ -78,7 +79,7 @@ function extractText(html: string): string {
     const text = raw.replace(/\s+/g, ' ').trim();
     return text.length > MAX_CONTENT_CHARS ? `${text.slice(0, MAX_CONTENT_CHARS)}…` : text;
   } catch (error) {
-    console.error('extractText failed:', error);
+    log.error('extractText failed:', error);
     return '';
   }
 }
@@ -141,7 +142,7 @@ async function runContentFetchLoop(taskId: string, days: number, limit: number) 
     task.message = `失败：${msg}`;
     task.finishedAt = Date.now();
     task.updatedAt = Date.now();
-    console.error(`[content-fetch ${taskId}] 失败: ${msg}`);
+    log.error(`[content-fetch ${taskId}] 失败: ${msg}`);
   };
 
   const touch = (message?: string) => {
@@ -166,7 +167,7 @@ async function runContentFetchLoop(taskId: string, days: number, limit: number) 
     }
 
     touch(`共 ${articles.length} 篇待补抓，开始抓取（服务端直连）...`);
-    console.log(`[content-fetch ${taskId}] 开始补抓 ${articles.length} 篇正文（直连模式）`);
+    log.info(`[content-fetch ${taskId}] 开始补抓 ${articles.length} 篇正文（直连模式）`);
 
     // 2. 逐篇抓取
     task.phase = 'fetching';
@@ -192,10 +193,10 @@ async function runContentFetchLoop(taskId: string, days: number, limit: number) 
         task.failed++;
         consecutiveFail++;
         if (msg.includes('403') || msg.includes('429') || msg.includes('401')) {
-          console.warn(`[content-fetch ${taskId}] ${progress} 被限流(${msg})，退避 ${RATE_LIMIT_SLEEP_MS}ms`);
+          log.warn(`[content-fetch ${taskId}] ${progress} 被限流(${msg})，退避 ${RATE_LIMIT_SLEEP_MS}ms`);
           await new Promise(r => setTimeout(r, RATE_LIMIT_SLEEP_MS));
         } else {
-          console.warn(`[content-fetch ${taskId}] ${progress} 失败: ${msg}`);
+          log.warn(`[content-fetch ${taskId}] ${progress} 失败: ${msg}`);
         }
       }
 
@@ -215,7 +216,7 @@ async function runContentFetchLoop(taskId: string, days: number, limit: number) 
     task.message = `完成：成功补抓 ${task.done} 篇正文${failedHint}`;
     task.finishedAt = Date.now();
     task.updatedAt = Date.now();
-    console.log(`[content-fetch ${taskId}] 完成，成功 ${task.done}，失败 ${task.failed}`);
+    log.info(`[content-fetch ${taskId}] 完成，成功 ${task.done}，失败 ${task.failed}`);
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
   }

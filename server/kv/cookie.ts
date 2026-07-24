@@ -1,4 +1,5 @@
 import { type CookieEntity } from '~/server/utils/CookieStore';
+import { log } from '~/server/utils/log';
 
 export type CookieKVKey = string;
 
@@ -16,7 +17,7 @@ export async function setMpCookie(key: CookieKVKey, data: CookieKVValue): Promis
     });
     return true;
   } catch (err) {
-    console.error('kv.set call failed:', err);
+    log.error('kv.set call failed:', err);
     return false;
   }
 }

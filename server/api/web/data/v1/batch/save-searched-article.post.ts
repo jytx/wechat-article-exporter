@@ -14,6 +14,7 @@
 import { saveAccount } from '~/server/database/account';
 import { saveArticles, type Article } from '~/server/database/article';
 import { successResponse, createApiError, ErrorCodes } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface SaveSearchedBody {
   article: Partial<Article> & { key: string; fakeid: string; aid: string; title: string; link: string };
@@ -48,7 +49,7 @@ export default defineEventHandler(async event => {
       synced_count: 0,
       create_time: now,
       update_time: now,
-    }).catch(e => console.error('搜索入库时保存公众号失败:', e));
+    }).catch(e => log.error('搜索入库时保存公众号失败:', e));
   }
 
   // 2. 保存文章

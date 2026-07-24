@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     };
 
   } catch (error) {
-    console.error('登出失败:', error);
+    log.error('登出失败:', error);
     throw createError({
       statusCode: 500,
       message: '登出失败，请稍后重试'

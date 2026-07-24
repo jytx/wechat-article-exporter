@@ -5,6 +5,7 @@
 
 import { getAccount, saveAccount } from '~/server/database/account';
 import { createApiError, ErrorCodes, successResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface UpdateAccountBody {
   nickname?: string;
@@ -55,7 +56,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('更新公众号失败:', error);
+    log.error('更新公众号失败:', error);
     throw createError({
       statusCode: 500,
       message: '更新公众号失败',

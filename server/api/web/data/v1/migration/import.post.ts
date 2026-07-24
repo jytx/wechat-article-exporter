@@ -6,6 +6,7 @@
 import { saveAccount } from '~/server/database/account';
 import { saveArticles } from '~/server/database/article';
 import { successResponse, validateParams, ErrorCodes, createApiError } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface ImportDataBody {
   accounts: Array<{
@@ -80,7 +81,7 @@ export default defineEventHandler(async (event) => {
         accountsImported++;
 
       } catch (error) {
-        console.error(`导入公众号失败 [${account.fakeid}]:`, error);
+        log.error(`导入公众号失败 [${account.fakeid}]:`, error);
         errors.push(`导入公众号失败 [${account.fakeid}]: ${error instanceof Error ? error.message : '未知错误'}`);
       }
     }
@@ -97,7 +98,7 @@ export default defineEventHandler(async (event) => {
           const saved = await saveArticles(batch);
           articlesImported += saved;
         } catch (error) {
-          console.error(`批量导入文章失败 [${i}]:`, error);
+          log.error(`批量导入文章失败 [${i}]:`, error);
           errors.push(`批量导入文章失败: ${error instanceof Error ? error.message : '未知错误'}`);
         }
       }
@@ -115,7 +116,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('导入数据失败:', error);
+    log.error('导入数据失败:', error);
     throw createError({
       statusCode: 500,
       message: '导入数据失败'

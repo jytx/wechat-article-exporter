@@ -7,6 +7,7 @@ import { updateAccountSyncedCount } from '~/server/database/account';
 import { getArticlesByFakeid, saveArticles } from '~/server/database/article';
 import { createApiError, ErrorCodes, successResponse, validateParams } from '~/server/utils/api-response';
 import { getDatabase } from '~/server/utils/database';
+import { log } from '~/server/utils/log';
 
 interface ArticleInput {
   key: string;
@@ -58,7 +59,7 @@ export default defineEventHandler(async event => {
     const newArticles = body.articles.filter(article => !existingKeys.has(article.key));
 
     if (newArticles.length === 0) {
-      console.log(`[save-articles] 所有文章已存在，跳过保存。fakeid: ${fakeid}`);
+      log.info(`[save-articles] 所有文章已存在，跳过保存。fakeid: ${fakeid}`);
       return successResponse(
         {
           saved: 0,
@@ -69,7 +70,7 @@ export default defineEventHandler(async event => {
       );
     }
 
-    console.log(`[save-articles] 新文章数: ${newArticles.length}, 总数: ${body.articles.length}, fakeid: ${fakeid}`);
+    log.info(`[save-articles] 新文章数: ${newArticles.length}, 总数: ${body.articles.length}, fakeid: ${fakeid}`);
 
     // 批量保存新文章
     const saved = await saveArticles(newArticles);
@@ -79,11 +80,11 @@ export default defineEventHandler(async event => {
       try {
         // 获取该公众号的文章总数
         const result = await getArticlesByFakeid(fakeid);
-        console.log(`[save-articles] fakeid: ${fakeid}, saved: ${saved}, result.total: ${result.total}`);
+        log.info(`[save-articles] fakeid: ${fakeid}, saved: ${saved}, result.total: ${result.total}`);
         // 更新同步文章数
         await updateAccountSyncedCount(fakeid, result.total);
       } catch (error) {
-        console.error('更新公众号统计失败:', error);
+        log.error('更新公众号统计失败:', error);
         // 不影响主流程，只记录错误
       }
     }
@@ -102,7 +103,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('批量保存文章失败:', error);
+    log.error('批量保存文章失败:', error);
     throw createError({
       statusCode: 500,
       message: '批量保存文章失败',

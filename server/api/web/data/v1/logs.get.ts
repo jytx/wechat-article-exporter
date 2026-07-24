@@ -14,7 +14,7 @@ import { successResponse } from '~/server/utils/api-response';
 /** 日志行的结构化解析结果 */
 interface LogLine {
   raw: string;
-  type: 'sync' | 'schedule' | 'other';
+  type: 'sync' | 'schedule' | 'subscription' | 'other';
   level: 'info' | 'warn' | 'error';
 }
 
@@ -37,6 +37,8 @@ function parseLogLine(line: string): LogLine {
     type = 'sync';
   } else if (line.includes('[auto-sync]')) {
     type = 'schedule';
+  } else if (line.includes('[subscription]')) {
+    type = 'subscription';
   }
 
   return { raw: line, type, level };

@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('查询迁移状态失败:', error);
+    log.error('查询迁移状态失败:', error);
     throw createError({
       statusCode: 500,
       message: '查询迁移状态失败'

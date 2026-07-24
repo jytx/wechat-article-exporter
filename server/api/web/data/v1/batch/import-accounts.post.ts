@@ -5,6 +5,7 @@
 
 import { saveAccount, getAccount } from '~/server/database/account';
 import { successResponse, validateParams, ErrorCodes, createApiError } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface ImportAccountsBody {
   accounts: Array<{
@@ -83,7 +84,7 @@ export default defineEventHandler(async (event) => {
         successCount++;
 
       } catch (error) {
-        console.error(`导入公众号失败 [${i}]:`, error);
+        log.error(`导入公众号失败 [${i}]:`, error);
         errors.push({
           index: i,
           fakeid: item.fakeid || 'unknown',
@@ -106,7 +107,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
 
-    console.error('批量导入公众号失败:', error);
+    log.error('批量导入公众号失败:', error);
     throw createError({
       statusCode: 500,
       message: '批量导入公众号失败'

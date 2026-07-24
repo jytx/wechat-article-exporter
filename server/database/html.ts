@@ -3,6 +3,7 @@
  */
 
 import { getDatabase } from '~/server/utils/database';
+import { log } from '~/server/utils/log';
 
 export interface ArticleHtml {
   id?: number;
@@ -39,7 +40,7 @@ export async function saveArticleHtml(html: ArticleHtml): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('saveArticleHtml failed:', error);
+    log.error('saveArticleHtml failed:', error);
     return false;
   }
 }
@@ -54,7 +55,7 @@ export async function getArticleHtml(url: string): Promise<ArticleHtml | null> {
     const row = stmt.get(url) as any;
     return row || null;
   } catch (error) {
-    console.error('getArticleHtml failed:', error);
+    log.error('getArticleHtml failed:', error);
     return null;
   }
 }
@@ -75,7 +76,7 @@ export async function getArticleHtmlBatch(urls: string[]): Promise<Map<string, A
     }
     return map;
   } catch (error) {
-    console.error('getArticleHtmlBatch failed:', error);
+    log.error('getArticleHtmlBatch failed:', error);
     return new Map();
   }
 }
@@ -90,7 +91,7 @@ export async function isArticleHtmlDownloaded(url: string): Promise<boolean> {
     const row = stmt.get(url) as { count: number };
     return row.count > 0;
   } catch (error) {
-    console.error('isArticleHtmlDownloaded failed:', error);
+    log.error('isArticleHtmlDownloaded failed:', error);
     return false;
   }
 }
@@ -105,7 +106,7 @@ export async function deleteArticleHtml(url: string): Promise<boolean> {
     stmt.run(url);
     return true;
   } catch (error) {
-    console.error('deleteArticleHtml failed:', error);
+    log.error('deleteArticleHtml failed:', error);
     return false;
   }
 }
@@ -120,7 +121,7 @@ export async function clearArticleHtmlByFakeid(fakeid: string): Promise<number> 
     const result = stmt.run(fakeid);
     return result.changes;
   } catch (error) {
-    console.error('clearArticleHtmlByFakeid failed:', error);
+    log.error('clearArticleHtmlByFakeid failed:', error);
     return 0;
   }
 }

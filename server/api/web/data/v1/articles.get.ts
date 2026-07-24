@@ -6,6 +6,7 @@
 import { getAccount, getAllAccounts } from '~/server/database/account';
 import { getArticlesByFakeid } from '~/server/database/article';
 import { createApiError, ErrorCodes, getPaginationParams, paginatedResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   try {
@@ -17,7 +18,7 @@ export default defineEventHandler(async event => {
     const status = (query.status as string) || 'all';
     const search = (query.search as string) || '';
 
-    console.log(
+    log.info(
       `[articles.get] 分页参数: page=${page}, pageSize=${pageSize}, fakeid=${fakeid || '全部'}, search="${search || ''}"`
     );
 
@@ -38,9 +39,9 @@ export default defineEventHandler(async event => {
         limit: pageSize,
         search: search || undefined,
       });
-      console.log(`[articles.get] 数据库返回: items.length=${result.items.length}, total=${result.total}`);
+      log.info(`[articles.get] 数据库返回: items.length=${result.items.length}, total=${result.total}`);
       if (result.items.length > 0) {
-        console.log(`[articles.get] 第一篇文章数据:`, JSON.stringify(result.items[0], null, 2));
+        log.info(`[articles.get] 第一篇文章数据:`, JSON.stringify(result.items[0], null, 2));
       }
       articles = result.items;
       total = result.total;
@@ -49,7 +50,7 @@ export default defineEventHandler(async event => {
       const allAccounts = await getAllAccounts();
       const allArticles: any[] = [];
 
-      console.log(`[articles.get] 找到 ${allAccounts.length} 个公众号`);
+      log.info(`[articles.get] 找到 ${allAccounts.length} 个公众号`);
 
       for (const account of allAccounts) {
         try {
@@ -58,16 +59,16 @@ export default defineEventHandler(async event => {
             limit: Number.MAX_SAFE_INTEGER, // 获取该公众号所有文章
             search: search || undefined,
           });
-          console.log(
+          log.info(
             `[articles.get] 公众号 ${account.nickname} (${account.fakeid}) 有 ${accountArticles.items.length} 篇文章`
           );
           allArticles.push(...accountArticles.items);
         } catch (error) {
-          console.error(`[articles.get] 获取公众号 ${account.fakeid} 的文章失败:`, error);
+          log.error(`[articles.get] 获取公众号 ${account.fakeid} 的文章失败:`, error);
         }
       }
 
-      console.log(`[articles.get] 总共获取到 ${allArticles.length} 篇文章`);
+      log.info(`[articles.get] 总共获取到 ${allArticles.length} 篇文章`);
 
       // 按创建时间降序排序
       allArticles.sort((a, b) => (b.create_time || 0) - (a.create_time || 0));
@@ -78,7 +79,7 @@ export default defineEventHandler(async event => {
       const endIndex = startIndex + pageSize;
       articles = allArticles.slice(startIndex, endIndex);
 
-      console.log(`[articles.get] 分页返回: ${articles.length} 条, 总数: ${total}`);
+      log.info(`[articles.get] 分页返回: ${articles.length} 条, 总数: ${total}`);
     }
 
     // 解析 appmsg_album_infos JSON 字符串为数组
@@ -87,7 +88,7 @@ export default defineEventHandler(async event => {
         try {
           article.appmsg_album_infos = JSON.parse(article.appmsg_album_infos);
         } catch (e) {
-          console.error('解析 appmsg_album_infos 失败:', e);
+          log.error('解析 appmsg_album_infos 失败:', e);
           article.appmsg_album_infos = [];
         }
       }
@@ -97,7 +98,7 @@ export default defineEventHandler(async event => {
     // 根据状态过滤
     let filtered = articles;
 
-    console.log(`[articles.get] 过滤前: ${articles.length} 条, total=${total}`);
+    log.info(`[articles.get] 过滤前: ${articles.length} 条, total=${total}`);
 
     if (status === 'downloaded') {
       filtered = articles.filter(a => a.downloaded);
@@ -109,7 +110,7 @@ export default defineEventHandler(async event => {
       filtered = articles.filter(a => !a.is_deleted);
     }
 
-    console.log(
+    log.info(
       `[articles.get] 过滤后: ${filtered.length} 条, 返回分页: page=${page}, pageSize=${pageSize}, total=${total}, totalPages=${Math.ceil(total / pageSize)}`
     );
 
@@ -120,7 +121,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('获取文章列表失败:', error);
+    log.error('获取文章列表失败:', error);
     throw createError({
       statusCode: 500,
       message: '获取文章列表失败',

@@ -6,6 +6,7 @@
 import { getQuery } from 'h3';
 import { getArticleByUrl } from '~/server/database/article';
 import { successResponse, createApiError, ErrorCodes } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   try {
@@ -29,7 +30,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('根据链接获取文章失败:', error);
+    log.error('根据链接获取文章失败:', error);
     throw createError({
       statusCode: 500,
       message: '根据链接获取文章失败',

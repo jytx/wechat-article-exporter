@@ -85,12 +85,12 @@ export async function proxyMpRequest(options: RequestOptions) {
         throw new Error(`redirect_url 中未找到 token 参数: ${redirectUrl}`);
       }
 
-      console.log('token', token);
+      log.info('token', token);
       const success = await cookieStore.setCookie(authKey, token, mpResponse.headers.getSetCookie());
       if (!success) {
         throw new Error('cookie 写入数据库失败');
       }
-      console.log('cookie 写入成功');
+      log.info('cookie 写入成功');
 
       setCookies = [
         // 返回临时的 auth-key 给客户端
@@ -100,7 +100,7 @@ export async function proxyMpRequest(options: RequestOptions) {
         `uuid=EXPIRED; Path=/; Expires=${dayjs().subtract(1, 'days').toString()}; Secure; HttpOnly`,
       ];
     } catch (error) {
-      console.error('action(login) failed:', error);
+      log.error('action(login) failed:', error);
 
       // 登录失败时返回错误响应，而不是静默继续
       return new Response(JSON.stringify({ base_resp: { ret: -1, err_msg: `登录处理失败: ${error}` } }), {

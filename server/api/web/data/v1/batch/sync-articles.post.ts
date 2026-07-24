@@ -6,6 +6,7 @@
 import { getAccount, updateAccountSyncedCount, updateAccountTotalCount } from '~/server/database/account';
 import { getArticlesByFakeid, saveArticles } from '~/server/database/article';
 import { createApiError, ErrorCodes, successResponse, validateParams } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface SyncArticlesBody {
   fakeid: string;
@@ -105,7 +106,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('批量同步文章失败:', error);
+    log.error('批量同步文章失败:', error);
     throw createError({
       statusCode: 500,
       message: '批量同步文章失败',

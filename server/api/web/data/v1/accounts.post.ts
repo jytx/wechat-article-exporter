@@ -5,6 +5,7 @@
 
 import { getAccount, saveAccount } from '~/server/database/account';
 import { createApiError, ErrorCodes, successResponse, validateParams } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 interface CreateAccountBody {
   fakeid: string;
@@ -59,7 +60,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('添加公众号失败:', error);
+    log.error('添加公众号失败:', error);
     throw createError({
       statusCode: 500,
       message: '添加公众号失败',

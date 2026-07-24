@@ -5,6 +5,7 @@
 
 import { getDatabase } from '~/server/utils/database';
 import type { CookieEntity } from '~/server/utils/CookieStore';
+import { log } from '~/server/utils/log';
 
 export interface Cookie {
   auth_key: string;
@@ -39,7 +40,7 @@ export async function setMpCookie(key: CookieKVKey, data: CookieKVValue): Promis
     stmt.run(key, data.token, cookiesJson);
     return true;
   } catch (error) {
-    console.error('setMpCookie failed:', error);
+    log.error('setMpCookie failed:', error);
     return false;
   }
 }
@@ -65,7 +66,7 @@ export async function getMpCookie(key: CookieKVKey): Promise<CookieKVValue | nul
       cookies: cookies,
     };
   } catch (error) {
-    console.error('getMpCookie failed:', error);
+    log.error('getMpCookie failed:', error);
     return null;
   }
 }
@@ -84,7 +85,7 @@ export async function saveCookie(cookie: Cookie): Promise<boolean> {
     stmt.run(cookie.auth_key, cookie.token, cookie.cookies);
     return true;
   } catch (error) {
-    console.error('saveCookie failed:', error);
+    log.error('saveCookie failed:', error);
     return false;
   }
 }
@@ -99,7 +100,7 @@ export async function getCookie(authKey: string): Promise<Cookie | null> {
     const row = stmt.get(authKey) as any;
     return row || null;
   } catch (error) {
-    console.error('getCookie failed:', error);
+    log.error('getCookie failed:', error);
     return null;
   }
 }
@@ -114,7 +115,7 @@ export async function getCookieByToken(token: string): Promise<Cookie | null> {
     const row = stmt.get(token) as any;
     return row || null;
   } catch (error) {
-    console.error('getCookieByToken failed:', error);
+    log.error('getCookieByToken failed:', error);
     return null;
   }
 }
@@ -129,7 +130,7 @@ export async function deleteCookie(authKey: string): Promise<boolean> {
     stmt.run(authKey);
     return true;
   } catch (error) {
-    console.error('deleteCookie failed:', error);
+    log.error('deleteCookie failed:', error);
     return false;
   }
 }
@@ -143,7 +144,7 @@ export async function getAllCookies(): Promise<Cookie[]> {
     const stmt = db.prepare('SELECT * FROM cookies ORDER BY updated_at DESC');
     return stmt.all() as Cookie[];
   } catch (error) {
-    console.error('getAllCookies failed:', error);
+    log.error('getAllCookies failed:', error);
     return [];
   }
 }

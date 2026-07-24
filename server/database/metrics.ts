@@ -4,6 +4,7 @@
  */
 
 import { getDatabase } from '~/server/utils/database';
+import { log } from '~/server/utils/log';
 
 export interface ArticleMetric {
   url: string;
@@ -56,7 +57,7 @@ export async function upsertMetric(metric: ArticleMetric): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('upsertMetric failed:', error);
+    log.error('upsertMetric failed:', error);
     return false;
   }
 }
@@ -95,7 +96,7 @@ export async function upsertMetrics(metrics: ArticleMetric[]): Promise<number> {
     insertMany(metrics);
     return metrics.length;
   } catch (error) {
-    console.error('upsertMetrics failed:', error);
+    log.error('upsertMetrics failed:', error);
     return 0;
   }
 }
@@ -168,7 +169,7 @@ export async function getMetricsRanking(query: RankingQuery): Promise<{
 
     return { items: rows, total };
   } catch (error) {
-    console.error('getMetricsRanking failed:', error);
+    log.error('getMetricsRanking failed:', error);
     return { items: [], total: 0 };
   }
 }
@@ -183,7 +184,7 @@ export async function getMetricByUrl(url: string): Promise<ArticleMetric | null>
     const row = stmt.get(url) as any;
     return row || null;
   } catch (error) {
-    console.error('getMetricByUrl failed:', error);
+    log.error('getMetricByUrl failed:', error);
     return null;
   }
 }
@@ -216,7 +217,7 @@ export async function getMetricsStats(): Promise<MetricsStats> {
       last_sampled_at: row.last_sampled_at || null,
     };
   } catch (error) {
-    console.error('getMetricsStats failed:', error);
+    log.error('getMetricsStats failed:', error);
     return { total_articles: 0, total_accounts: 0, last_sampled_at: null };
   }
 }

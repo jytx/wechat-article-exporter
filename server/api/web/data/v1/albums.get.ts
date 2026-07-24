@@ -6,6 +6,7 @@
 import { getAccount } from '~/server/database/account';
 import { getDatabase } from '~/server/utils/database';
 import { createApiError, ErrorCodes, successResponse } from '~/server/utils/api-response';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async event => {
   try {
@@ -67,7 +68,7 @@ export default defineEventHandler(async event => {
       throw error;
     }
 
-    console.error('获取合集列表失败:', error);
+    log.error('获取合集列表失败:', error);
     throw createError({
       statusCode: 500,
       message: '获取合集列表失败',

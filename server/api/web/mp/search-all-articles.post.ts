@@ -4,6 +4,7 @@
 
 import { USER_AGENT } from '~/config';
 import { getCookieFromStore, getTokenFromStore } from '~/server/utils/CookieStore';
+import { log } from '~/server/utils/log';
 
 interface SearchAllArticlesBody {
   keyword: string;
@@ -186,7 +187,7 @@ export default defineEventHandler(async event => {
       // 用 returned>=count 会误判为没有更多了。
       const hasMore = begin + articles.length < totalReturned;
 
-      console.log(
+      log.info(
         `[search-all-articles] keyword="${keyword}" begin=${begin} count=${count} returned=${articles.length} total=${totalReturned} hasMore=${hasMore}`,
       );
 
@@ -204,7 +205,7 @@ export default defineEventHandler(async event => {
       };
     }
   } catch (error: any) {
-    console.error('搜索所有文章失败:', error);
+    log.error('搜索所有文章失败:', error);
     return {
       base_resp: {
         ret: -1,

@@ -6,6 +6,7 @@
 import { getAllAccounts } from '~/server/database/account';
 import { getAllArticlesByFakeid } from '~/server/database/article';
 import { createError } from 'h3';
+import { log } from '~/server/utils/log';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -75,7 +76,7 @@ export default defineEventHandler(async (event) => {
     return exportData;
 
   } catch (error) {
-    console.error('导出公众号数据失败:', error);
+    log.error('导出公众号数据失败:', error);
     throw createError({
       statusCode: 500,
       message: '导出公众号数据失败'

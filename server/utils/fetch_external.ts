@@ -15,7 +15,7 @@ export async function fetchExternal(url: string, option: FetchExternalOption): P
     return await resp.json();
   } catch (error) {
     // 记录日志，便于后期排查
-    console.error(`${option.label}失败:`, error);
+    log.error(`${option.label}失败:`, error);
 
     return option.default;
   }
