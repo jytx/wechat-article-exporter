@@ -27,14 +27,14 @@
           <!-- 文章同步 -->
           <SettingSync />
 
-          <!-- 其他设置 -->
-          <SettingMisc />
-
           <!-- 消息通知 -->
           <SettingNotification ref="notificationRef" />
 
           <!-- 文章订阅 -->
           <SettingSubscription ref="subscriptionRef" />
+
+          <!-- 其他设置 -->
+          <SettingMisc />
         </div>
       </div>
     </div>

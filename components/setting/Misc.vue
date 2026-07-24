@@ -5,7 +5,7 @@
     </template>
 
     <div class="flex flex-col space-y-5">
-      <div class="flex gap-1">
+      <div class="flex items-center gap-2">
         <ElCheckbox v-model="preferences.hideDeleted" name="hideDeleted">隐藏已删除文章</ElCheckbox>
         <ElPopover trigger="hover" placement="top">
           <p class="max-w-[300px] p-3 text-sm text-gray-500">
@@ -13,12 +13,12 @@
             若勾选该选项，则文章下载表格将过滤掉已经被删除的文章(无论文章内容是否已被下载)。
           </p>
           <template #reference>
-            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
+            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-4" />
           </template>
         </ElPopover>
       </div>
 
-      <div class="flex gap-1">
+      <div class="flex items-center gap-2">
         <ElCheckbox
           v-model="preferences.downloadConfig.forceDownloadContent"
           name="forceDownloadContent"
@@ -30,12 +30,12 @@
             若勾选该选项，则会忽略已缓存内容，强制重新下载最新文章内容。<br />
           </p>
           <template #reference>
-            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
+            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-4" />
           </template>
         </ElPopover>
       </div>
 
-      <div class="flex gap-1">
+      <div class="flex items-center gap-2">
         <ElCheckbox
           v-model="preferences.downloadConfig.metadataOverrideContent"
           name="metadataOverrideContent"
@@ -47,7 +47,7 @@
             若勾选该选项，则文章内容会同时保存到缓存中(会占用一定的存储空间)。
           </p>
           <template #reference>
-            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-5" />
+            <UIcon color="gray" name="i-heroicons:question-mark-circle-16-solid" class="size-4" />
           </template>
         </ElPopover>
       </div>

@@ -24,7 +24,8 @@
           type="number"
           v-model="preferences.accountSyncSeconds"
           placeholder="3-10"
-          class="w-52 font-mono"
+          style="width: 120px"
+          class="font-mono"
           :min="1"
           :max="60"
         >
@@ -37,16 +38,14 @@
 
       <!-- 同步时间范围 -->
       <div>
-        <p class="mb-2 flex items-center justify-between">
-          <span class="text-sm">
-            同步时间范围:
-            <span class="text-xs text-slate-500">(只能从当前时间开始往前同步)</span>
-          </span>
+        <p class="mb-2 flex items-center gap-2">
+          <span class="text-sm">同步时间范围:</span>
+          <span class="text-xs text-slate-500">(只能从当前时间开始往前同步)</span>
           <span class="text-sm text-blue-500 font-medium">{{ getActualDateRange() }}</span>
         </p>
         <div class="flex gap-3">
           <ElSelect
-            class="w-1/2"
+            style="width: 180px"
             v-model="preferences.syncDateRange"
           >
             <ElOption
@@ -99,7 +98,8 @@
             <ElInput
               v-model="syncSchedule.cron"
               placeholder="0 3 * * *"
-              class="w-52 font-mono"
+              style="width: 140px"
+              class="font-mono"
               :disabled="!syncSchedule.enabled"
             />
             <span class="text-xs text-gray-400">

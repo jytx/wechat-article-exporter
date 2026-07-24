@@ -38,35 +38,31 @@
         <div v-if="config.email.enabled" class="flex flex-col gap-4">
           <div>
             <label class="block text-sm mb-1">SMTP 服务器</label>
-            <ElInput v-model="config.email.host" placeholder="smtp.qq.com" class="font-mono w-full max-w-md" />
+            <ElInput v-model="config.email.host" placeholder="smtp.qq.com" style="width: 300px" class="font-mono" />
           </div>
-          <div class="flex items-end gap-4 flex-wrap">
-            <div>
-              <label class="block text-sm mb-1">端口</label>
-              <ElInput v-model.number="config.email.port" type="number" placeholder="465" class="font-mono w-24" />
-            </div>
-            <ElCheckbox v-model="config.email.secure" name="emailSecure" class="mb-2">SSL/TLS 加密</ElCheckbox>
-            <span class="text-xs text-gray-400 mb-2">端口 465 通常开启，587 通常关闭</span>
+          <div>
+            <label class="block text-sm mb-1">端口</label>
+            <ElInput v-model.number="config.email.port" type="number" placeholder="465" style="width: 300px" class="font-mono" />
           </div>
-          <div class="flex gap-4 flex-wrap">
-            <div class="flex-1 min-w-[200px]">
-              <label class="block text-sm mb-1">发件邮箱账号</label>
-              <ElInput v-model="config.email.user" placeholder="user@qq.com" class="font-mono w-full" />
-            </div>
-            <div class="flex-1 min-w-[200px]">
-              <label class="block text-sm mb-1">授权码 / 密码</label>
-              <ElInput v-model="config.email.pass" type="password" placeholder="SMTP 授权码" class="font-mono w-full" />
-            </div>
+          <div>
+            <ElCheckbox v-model="config.email.secure" name="emailSecure">SSL/TLS 加密</ElCheckbox>
+            <span class="text-xs text-gray-400 ml-2">端口 465 通常开启，587 通常关闭</span>
           </div>
-          <div class="flex gap-4 flex-wrap">
-            <div>
-              <label class="block text-sm mb-1">发件人名称</label>
-              <ElInput v-model="config.email.fromName" placeholder="微信文章导出器" class="w-52" />
-            </div>
-            <div class="flex-1 min-w-[200px]">
-              <label class="block text-sm mb-1">收件邮箱</label>
-              <ElInput v-model="config.email.to" placeholder="多个用逗号分隔" class="font-mono w-full" />
-            </div>
+          <div>
+            <label class="block text-sm mb-1">发件邮箱账号</label>
+            <ElInput v-model="config.email.user" placeholder="user@qq.com" style="width: 300px" class="font-mono" />
+          </div>
+          <div>
+            <label class="block text-sm mb-1">授权码 / 密码</label>
+            <ElInput v-model="config.email.pass" type="password" placeholder="SMTP 授权码" style="width: 300px" class="font-mono" />
+          </div>
+          <div>
+            <label class="block text-sm mb-1">发件人名称</label>
+            <ElInput v-model="config.email.fromName" placeholder="微信文章导出器" style="width: 300px" />
+          </div>
+          <div>
+            <label class="block text-sm mb-1">收件邮箱</label>
+            <ElInput v-model="config.email.to" placeholder="多个用逗号分隔" style="width: 300px" class="font-mono" />
           </div>
         </div>
       </div>
@@ -92,7 +88,7 @@
             <label class="block text-sm mb-1">平台类型</label>
             <ElSelect
               v-model="config.webhook.type"
-              class="w-52"
+              style="width: 180px"
             >
               <ElOption
                 v-for="item in WEBHOOK_OPTIONS"
@@ -104,7 +100,7 @@
           </div>
           <div>
             <label class="block text-sm mb-1">Webhook URL</label>
-            <ElInput v-model="config.webhook.url" placeholder="https://..." class="font-mono w-full max-w-2xl" />
+            <ElInput v-model="config.webhook.url" placeholder="https://..." style="width: 400px" class="font-mono" />
           </div>
         </div>
       </div>

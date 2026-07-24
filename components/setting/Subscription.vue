@@ -34,7 +34,7 @@
         <div>
           <label class="block text-sm mb-1">推送频率（Cron 表达式）</label>
           <div class="flex items-center gap-2 flex-wrap">
-            <ElInput v-model="config.cron" placeholder="0 9 * * *" class="w-52 font-mono" />
+            <ElInput v-model="config.cron" placeholder="0 9 * * *" style="width: 180px" class="font-mono" />
             <span class="text-xs text-gray-400">
               <button type="button" class="text-blue-500 hover:underline" @click="config.cron = '0 9 * * *'">每天9点</button> ·
               <button type="button" class="text-blue-500 hover:underline" @click="config.cron = '0 9 * * 1'">每周一</button> ·
@@ -49,7 +49,7 @@
           <label class="block text-sm mb-1">时间依据</label>
           <ElSelect
             v-model="config.timeField"
-            class="w-52"
+            style="width: 180px"
           >
             <ElOption
               v-for="item in TIME_FIELD_OPTIONS"
@@ -67,7 +67,7 @@
         <!-- 时间范围 -->
         <div>
           <label class="block text-sm mb-1">时间范围</label>
-          <ElInput v-model.number="config.days" type="number" :min="1" :max="30" class="w-32 font-mono">
+          <ElInput v-model.number="config.days" type="number" :min="1" :max="30" style="width: 100px" class="font-mono">
             <template #suffix>
               <span class="text-gray-500 dark:text-gray-400 text-xs">天</span>
             </template>
@@ -81,7 +81,7 @@
         <!-- 最大文章数 -->
         <div>
           <label class="block text-sm mb-1">单次最多推送</label>
-          <ElInput v-model.number="config.maxArticles" type="number" :min="1" :max="500" class="w-32 font-mono">
+          <ElInput v-model.number="config.maxArticles" type="number" :min="1" :max="500" style="width: 100px" class="font-mono">
             <template #suffix>
               <span class="text-gray-500 dark:text-gray-400 text-xs">篇</span>
             </template>

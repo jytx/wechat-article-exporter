@@ -36,7 +36,7 @@
         </div>
         <div class="mt-5">
           <label class="block text-sm mb-1">代理认证密钥（可选）</label>
-          <ElInput v-model="authorizationValue" class="font-mono w-full" placeholder="若代理需要鉴权才填，如 deno deploy 的 token" />
+          <ElInput v-model="authorizationValue" style="width: 400px" class="font-mono" placeholder="若代理需要鉴权才填，如 deno deploy 的 token" />
         </div>
       </div>
     </div>

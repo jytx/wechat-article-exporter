@@ -10,9 +10,9 @@
         <p class="mb-2">
           <span class="mr-3">导出目录名:</span>
           <span class="inline-block w-8">
-            <ElPopover trigger="hover" placement="right">
+            <ElPopover trigger="hover" placement="right" :width="500">
               <template #reference>
-                <ElButton size="small" />
+                <ElButton size="small" text><UIcon name="i-heroicons:variable-16-solid" class="size-4" /></ElButton>
               </template>
 
               <div class="p-4">
@@ -20,19 +20,19 @@
                   使用 <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">${变量名}</code> 的格式插入变量，例如：<code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">${YYYY}-${MM}-${DD}_${title}</code>
                 </p>
                 <p class="my-2 font-medium">支持的变量：</p>
-                <table class="w-full border-collapse border">
+                <table class="w-full border-collapse text-sm">
                   <tbody>
-                    <tr>
-                      <th class="w-20">变量</th>
-                      <th class="w-32">含义</th>
-                      <th class="w-20">变量</th>
-                      <th class="w-32">含义</th>
+                    <tr class="border-b border-gray-200">
+                      <th class="py-1.5 px-2 text-left text-gray-500 font-medium">变量</th>
+                      <th class="py-1.5 px-2 text-left text-gray-500 font-medium">含义</th>
+                      <th class="py-1.5 px-2 text-left text-gray-500 font-medium">变量</th>
+                      <th class="py-1.5 px-2 text-left text-gray-500 font-medium">含义</th>
                     </tr>
-                    <tr v-for="(item, idx) in variables" :key="idx">
-                      <td class="text-center">{{ item[0].name }}</td>
-                      <td class="text-center">{{ item[0].description }}</td>
-                      <td class="text-center">{{ item[1].name }}</td>
-                      <td class="text-center">{{ item[1].description }}</td>
+                    <tr v-for="(item, idx) in variables" :key="idx" class="border-b border-gray-100">
+                      <td class="py-1.5 px-2 font-mono">{{ item[0].name }}</td>
+                      <td class="py-1.5 px-2 text-gray-600">{{ item[0].description }}</td>
+                      <td class="py-1.5 px-2 font-mono">{{ item[1].name }}</td>
+                      <td class="py-1.5 px-2 text-gray-600">{{ item[1].description }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -43,7 +43,8 @@
         <p class="text-sm mb-2 text-gray-500">影响 <span class="font-mono">html/txt/markdown/word/pdf</span> 的导出</p>
         <ElInput
           placeholder="目录名格式"
-          class="w-[600px] font-mono"
+          style="width: 400px"
+          class="font-mono"
           name="dirname"
           v-model="preferences.exportConfig.dirname"
         />
@@ -70,15 +71,16 @@
         <ElInput
           placeholder="导出路径"
           v-model="preferences.exportConfig.exportPath"
-          class="w-[600px] font-mono"
+          style="width: 400px"
+          class="font-mono"
         />
       </div>
       <div>
         <p class="mb-2 flex items-center gap-3">
-          <span>目录名最大长度:</span>
-          <span class="text-xs text-gray-500">(0表示不限制)</span>
+          <span class="whitespace-nowrap">目录名最大长度:</span>
+          <span class="text-xs text-gray-500 whitespace-nowrap">(0表示不限制)</span>
           <ElInput
-            class=""
+            style="width: 100px; flex-shrink: 0"
             placeholder="目录名最大长度"
             v-model="preferences.exportConfig.maxlength"
             type="number"
@@ -99,6 +101,8 @@
           name="exportJsonIncludeContent"
           >导出 JSON 中包含文章内容</ElCheckbox
         >
+      </div>
+      <div>
         <ElCheckbox
           v-model="preferences.exportConfig.exportJsonIncludeComments"
           name="exportJsonIncludeComments"
