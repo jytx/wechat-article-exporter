@@ -804,25 +804,25 @@
 
     <!-- URL 添加弹框 -->
     <ElDialog v-model="urlModalOpen" width="520px">
-      <div class="p-6">
-	        <h3 class="text-lg font-semibold mb-4">通过 URL 添加公众号</h3>
-	        <ElInput
-	          v-model="urlInput"
-	          placeholder="粘贴公众号主页链接或文章链接"
-	          class="w-full font-mono"
-	          autofocus
-	          @keyup.enter="addAccountByUrl"
-	        />
-	        <p class="mt-2 text-xs text-gray-400">
-	          支持公众号主页链接（profile_ext）和文章链接（mp.weixin.qq.com/s/xxx）
-	        </p>
-	        <div class="flex justify-end gap-3 mt-6">
-	          <ElButton @click="urlModalOpen = false">取消</ElButton>
-	          <ElButton type="primary" :loading="urlAdding" :disabled="!urlInput.trim()" @click="addAccountByUrl">
-	            解析并添加
-	          </ElButton>
-        </div>
-      </div>
+      <template #header>
+        <h3 class="text-lg font-semibold">通过 URL 添加公众号</h3>
+      </template>
+      <ElInput
+        v-model="urlInput"
+        placeholder="粘贴公众号主页链接或文章链接"
+        class="w-full font-mono"
+        autofocus
+        @keyup.enter="addAccountByUrl"
+      />
+      <p class="mt-2 text-xs text-gray-400">
+        支持公众号主页链接（profile_ext）和文章链接（mp.weixin.qq.com/s/xxx）
+      </p>
+      <template #footer>
+        <ElButton @click="urlModalOpen = false">取消</ElButton>
+        <ElButton type="primary" :loading="urlAdding" :disabled="!urlInput.trim()" @click="addAccountByUrl">
+          解析并添加
+        </ElButton>
+      </template>
     </ElDialog>
   </div>
 </template>
