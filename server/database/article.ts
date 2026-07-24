@@ -451,9 +451,8 @@ export async function getRecentArticlesForTopic(limit = 50, days = 0): Promise<A
 /**
  * 查询指定时间戳之后的新文章（用于订阅推送）。
  *
- * 按 timeField 过滤：
- * - 'created_at'（入库时间）：确保每篇文章只被推送一次，调高频率也不会重复
- * - 'create_time'（发布时间）：只推最近 N 天发布的文章，不受同步时间影响
+ * 自动排除已在 article_push_log 中记录过的文章（精确去重），
+ * 确保同一篇文章无论用哪种时间字段、调多高频率都不会被重复推送。
  *
  * @param afterTimestamp 秒级时间戳
  * @param limit          最多返回条数
@@ -474,7 +473,10 @@ export async function getArticlesAfterTimestamp(
         `SELECT a.*, acc.nickname AS account_nickname, acc.alias AS account_alias
          FROM articles a
          LEFT JOIN accounts acc ON a.fakeid = acc.fakeid
-         WHERE a.is_deleted = 0 AND ${field} > ?
+         LEFT JOIN article_push_log pl ON pl.article_key = a.key
+         WHERE a.is_deleted = 0
+           AND ${field} > ?
+           AND pl.article_key IS NULL
          ORDER BY ${field} ASC
          LIMIT ?`
       )

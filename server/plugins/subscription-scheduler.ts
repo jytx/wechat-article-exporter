@@ -10,6 +10,7 @@
 import cron from 'node-cron';
 import { getSetting, setSetting } from '~/server/database/settings';
 import { getArticlesAfterTimestamp } from '~/server/database/article';
+import { markArticlesAsPushed } from '~/server/database/push-log';
 import { getNotificationConfig, sendEmail, sendWebhook } from '~/server/utils/notifier';
 import { buildDigestHtml, buildDigestText } from '~/server/utils/digest-builder';
 import { createDefaultSubscriptionConfig } from '~/types/subscription';
@@ -66,23 +67,24 @@ export async function runSubscription(): Promise<{ sent: boolean; articleCount: 
     return { sent: false, articleCount: 0, reason: '未配置任何通知渠道（邮箱/Webhook）' };
   }
 
-  // 查询文章：根据 timeField 决定用哪个时间过滤
-  // - created_at（入库时间）：按上次推送时间去重，同一篇文章只推一次
-  // - create_time（发布时间）：只推最近 N 天发布的文章
+  // 查询文章：根据 timeField 决定用哪个时间字段过滤
+  // - create_time（发布时间）：固定查最近 N 天发布的文章
+  // - created_at（入库时间）：用上次推送时间做时间窗口，缩小扫描范围
+  // 两种模式都通过 article_push_log 表精确去重，同一篇文章只推送一次
   const nowSec = Math.floor(Date.now() / 1000);
   let afterTimestamp: number;
 
   if (subConfig.timeField === 'create_time') {
-    // 按发布时间：固定查最近 N 天，不用 last_pushed_at 去重
+    // 按发布时间：固定查最近 N 天
     afterTimestamp = nowSec - subConfig.days * 86400;
   } else {
-    // 按入库时间：用上次推送时间去重
+    // 按入库时间：用上次推送时间做时间窗口（push_log 仍是最终去重保障）
     const lastPushedRaw = getSetting(LAST_PUSHED_KEY);
     afterTimestamp = lastPushedRaw ? parseInt(lastPushedRaw, 10) : (nowSec - subConfig.days * 86400);
   }
 
   const articles = await getArticlesAfterTimestamp(afterTimestamp, subConfig.maxArticles, subConfig.timeField);
-  log.info(`[subscription] 时间字段=${subConfig.timeField}，查到 ${articles.length} 篇文章（上限 ${subConfig.maxArticles}）`);
+  log.info(`[subscription] 时间字段=${subConfig.timeField}，查到 ${articles.length} 篇未推送文章（上限 ${subConfig.maxArticles}）`);
 
   if (articles.length === 0 && subConfig.onlyNewArticles) {
     return { sent: false, articleCount: 0, reason: '无新文章，跳过发送' };
@@ -118,8 +120,14 @@ export async function runSubscription(): Promise<{ sent: boolean; articleCount: 
     }
   }
 
-  // 只有 created_at 模式才更新 last_pushed_at（用于去重）
-  // create_time 模式每次都是查最近 N 天，不需要去重
+  // 推送成功后，记录已推送的文章（精确去重：下次查询自动排除）
+  if (anySuccess && articles.length > 0) {
+    const keys = articles.map((a) => a.key);
+    const newCount = markArticlesAsPushed(keys);
+    log.info(`[subscription] 已标记 ${newCount} 篇文章为已推送`);
+  }
+
+  // created_at 模式额外更新时间窗口，缩小下次扫描范围（push_log 是去重主保障）
   if (anySuccess && subConfig.timeField === 'created_at') {
     setSetting(LAST_PUSHED_KEY, String(nowSec));
   }

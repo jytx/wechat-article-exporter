@@ -152,6 +152,15 @@ function initializeSchema(database: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_article_content_fakeid ON article_content(fakeid);
   `);
+
+  // 文章推送去重表：记录每篇文章是否已被订阅推送过
+  // 以 article.key 为主键，保证同一篇文章无论用什么时间字段查询都只推送一次
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS article_push_log (
+      article_key TEXT PRIMARY KEY NOT NULL,
+      pushed_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    );
+  `);
 }
 
 /**
