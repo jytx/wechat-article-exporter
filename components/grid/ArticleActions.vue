@@ -1,19 +1,47 @@
 <script setup lang="ts">
 import type { ICellRendererParams } from 'ag-grid-community';
 
+interface ActionRow {
+  link?: string;
+  contentDownload?: boolean;
+  downloading?: boolean;
+  [key: string]: any;
+}
+
 interface Props {
-  params: ICellRendererParams & {
+  // AG Grid 旧用法（article.vue 仍在使用）
+  params?: ICellRendererParams & {
     onGotoLink?: (params: ICellRendererParams) => void;
     onPreview?: (params: ICellRendererParams) => void;
   };
+  // el-table 新用法（single.vue）
+  data?: ActionRow;
+  onPreview?: (row: any) => void;
+  onGotoLink?: (row: any) => void;
 }
 const props = defineProps<Props>();
 
+const row = computed<ActionRow>(() => {
+  if (props.data !== undefined) return props.data;
+  return (props.params?.data ?? {}) as ActionRow;
+});
+
+const contentDownload = computed(() => !!row.value.contentDownload);
+const downloading = computed(() => !!row.value.downloading);
+
 function gotoLink() {
-  props.params.onGotoLink && props.params.onGotoLink(props.params);
+  if (props.data !== undefined) {
+    props.onGotoLink?.(row.value);
+    return;
+  }
+  props.params?.onGotoLink && props.params.onGotoLink(props.params);
 }
 function preview() {
-  props.params.onPreview && props.params.onPreview(props.params);
+  if (props.data !== undefined) {
+    props.onPreview?.(row.value);
+    return;
+  }
+  props.params?.onPreview && props.params.onPreview(props.params);
 }
 </script>
 
@@ -29,7 +57,7 @@ function preview() {
         type="primary"
         circle
         text
-        :disabled="!params.data.contentDownload || params.data.downloading"
+        :disabled="!contentDownload || downloading"
         @click="preview"
         ><template #icon><UIcon name="i-heroicons:fire-16-solid" /></template></ElButton
       >

@@ -10,54 +10,89 @@ interface SyncProgressData {
   message: string;
 }
 
+interface AccountLike {
+  fakeid?: string;
+  [key: string]: any;
+}
+
+interface CommonSyncContext {
+  isDeleting?: boolean;
+  isSyncing?: boolean;
+  syncingRowId?: string | null;
+  syncingFakeids?: Set<string>;
+  /** 每个公众号的同步状态，区分排队/同步中/停止中 */
+  taskStatusMap?: Map<string, 'pending' | 'running' | 'canceling'>;
+  /** 同步实时进度（轮询更新） */
+  syncProgressMap?: Map<string, SyncProgressData>;
+}
+
 interface Props {
-  params: ICellRendererParams & {
+  // AG Grid 旧用法（保留兼容）
+  params?: ICellRendererParams & {
     onSync?: (params: ICellRendererParams) => void;
     onStop?: (params: ICellRendererParams) => void;
-    isDeleting: boolean;
-    isSyncing: boolean;
-    syncingRowId: string | null;
-    syncingFakeids?: Set<string>;
-    /** 每个公众号的同步状态，区分排队/同步中/停止中 */
-    taskStatusMap?: Map<string, 'pending' | 'running' | 'canceling'>;
-    /** 同步实时进度（轮询更新） */
-    syncProgressMap?: Map<string, SyncProgressData>;
-  };
+  } & CommonSyncContext;
+  // el-table 新用法（account.vue）
+  data?: AccountLike;
+  onSync?: (data: any) => void;
+  onStop?: (data: any) => void;
+  context?: CommonSyncContext;
 }
 const props = defineProps<Props>();
 
-function sync() {
-  props.params.onSync && props.params.onSync(props.params);
-}
-function stop() {
-  props.params.onStop && props.params.onStop(props.params);
-}
-const isDisabled = computed(() => props.params.isDeleting || props.params.isSyncing);
-
-// 该行是否在活跃任务中（pending 或 running）
-const isActive = computed(() => {
-  const fid = props.params.node.id || '';
-  if (props.params.syncingFakeids) {
-    return props.params.syncingFakeids.has(fid);
-  }
-  return props.params.isSyncing && fid === props.params.syncingRowId;
+/** 统一的同步上下文（AG Grid params 或 el-table context） */
+const ctx = computed<CommonSyncContext>(() => {
+  if (props.data !== undefined) return props.context ?? {};
+  return (props.params as any) ?? {};
 });
 
-/** 当前行的同步状态 */
+/** 当前行的 fakeid */
+const fid = computed(() => {
+  if (props.data !== undefined) return props.data?.fakeid || '';
+  // AG Grid 模式下使用 node.id（实为 getRowId 返回的 fakeid）
+  return props.params?.node?.id || props.params?.data?.fakeid || '';
+});
+
+function sync() {
+  if (props.data !== undefined) {
+    props.onSync?.(props.data as AccountLike);
+    return;
+  }
+  props.params?.onSync && props.params.onSync(props.params!);
+}
+function stop() {
+  if (props.data !== undefined) {
+    props.onStop?.(props.data as AccountLike);
+    return;
+  }
+  props.params?.onStop && props.params.onStop(props.params!);
+}
+const isDisabled = computed(() => !!ctx.value.isDeleting || !!ctx.value.isSyncing);
+
+/** 当前行是否在活跃任务中（pending 或 running） */
+const isActive = computed(() => {
+  const id = fid.value;
+  if (ctx.value.syncingFakeids) {
+    return ctx.value.syncingFakeids.has(id);
+  }
+  return !!ctx.value.isSyncing && id === ctx.value.syncingRowId;
+});
+
+/** 当前行是否在活跃任务中（pending 或 running） */
 const taskStatus = computed(() => {
   if (!isActive.value) return null;
-  const fid = props.params.node.id || '';
-  if (props.params.taskStatusMap) {
-    return props.params.taskStatusMap.get(fid) || 'running';
+  const id = fid.value;
+  if (ctx.value.taskStatusMap) {
+    return ctx.value.taskStatusMap.get(id) || 'running';
   }
   return 'running';
 });
 
 /** 当前进度数据 */
 const progress = computed<SyncProgressData | null>(() => {
-  const fid = props.params.node.id || '';
-  if (props.params.syncProgressMap) {
-    return props.params.syncProgressMap.get(fid) || null;
+  const id = fid.value;
+  if (ctx.value.syncProgressMap) {
+    return ctx.value.syncProgressMap.get(id) || null;
   }
   return null;
 });

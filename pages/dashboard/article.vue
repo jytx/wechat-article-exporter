@@ -1,45 +1,27 @@
 <script setup lang="ts">
-import type {
-  ColDef,
-  FilterChangedEvent,
-  GetRowIdParams,
-  GridApi,
-  GridOptions,
-  GridReadyEvent,
-  ICellRendererParams,
-  SelectionChangedEvent,
-  ValueFormatterParams,
-  ValueGetterParams,
-} from 'ag-grid-community';
-import { AgGridVue } from 'ag-grid-vue3';
-import { defu } from 'defu';
-import type { PreviewArticle } from '#components';
 import type { Ref } from 'vue';
+import type { PreviewArticle } from '#components';
 import { durationToSeconds, formatItemShowType, formatTimeStamp, sleep } from '#shared/utils/helpers';
 import { validateHTMLContent } from '#shared/utils/html';
+import SearchArticleDialog from '~/components/global/SearchArticleDialog.vue';
 import GridAlbum from '~/components/grid/Album.vue';
 import GridArticleActions from '~/components/grid/ArticleActions.vue';
-import GridCoverTooltip from '~/components/grid/CoverTooltip.vue';
-import GridStatusBar from '~/components/grid/StatusBar.vue';
 import AccountSelectorForArticle from '~/components/selector/AccountSelectorForArticle.vue';
+import toastFactory from '~/composables/toast';
+// 新增：使用文章 API
+import { useArticleApiWithState, useArticleFilter } from '~/composables/useArticleApi';
 import { isDev, websiteName } from '~/config';
-import { sharedGridOptions } from '~/config/shared-grid-options';
 // 保留：文章内容和留言的本地缓存（这些是下载的内容，不是查询的数据）
 import { getCommentCache } from '~/store/v2/comment';
 import { getDebugCache } from '~/store/v2/debug';
 import { getHtmlCache } from '~/store/v2/html';
 import { getMetadataCache, type Metadata } from '~/store/v2/metadata';
-	import { isArticleHtmlDownloadedOnServer } from '~/utils/server-html';
+import type { Article as ApiArticle } from '~/types/api';
 import type { Preferences } from '~/types/preferences';
 import type { AppMsgExWithFakeID } from '~/types/types';
 import type { ArticleMetadata } from '~/utils/download/types';
-import { createBooleanColumnFilterParams, createDateColumnFilterParams } from '~/utils/grid';
-// 新增：使用文章 API
-import { useArticleApiWithState, useArticleFilter } from '~/composables/useArticleApi';
-import type { Article as ApiArticle } from '~/types/api';
 import { exportArticlesToServer } from '~/utils/server-article-export';
-import SearchArticleDialog from '~/components/global/SearchArticleDialog.vue';
-import toastFactory from '~/composables/toast';
+import { isArticleHtmlDownloadedOnServer } from '~/utils/server-html';
 
 useHead({
   title: `文章下载 | ${websiteName}`,
@@ -105,322 +87,22 @@ function clearSearch() {
   refresh();
 }
 
-let globalRowData: Article[] = [];
+const tableRef = ref();
+const globalRowData = ref<Article[]>([]);
+const selectedRows = ref<Article[]>([]);
 
-const columnDefs = ref<ColDef[]>([
-  {
-    headerName: 'ID',
-    field: 'aid',
-    cellDataType: 'text',
-    filter: 'agTextColumnFilter',
-    minWidth: 150,
-    initialHide: true,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '公众号',
-    field: 'account_nickname',
-    cellDataType: 'text',
-    filter: 'agTextColumnFilter',
-    valueFormatter: p => p.value || '--',
-    minWidth: 150,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '链接',
-    field: 'link',
-    cellDataType: 'text',
-    filter: 'agTextColumnFilter',
-    minWidth: 150,
-    initialHide: true,
-    cellClass: 'font-mono',
-  },
-  {
-    headerName: '标题',
-    field: 'title',
-    cellDataType: 'text',
-    filter: 'agTextColumnFilter',
-    tooltipField: 'title',
-    minWidth: 200,
-  },
-  {
-    headerName: '封面',
-    field: 'cover',
-    sortable: false,
-    filter: false,
-    cellRenderer: (params: ICellRendererParams) => {
-      return `<img alt="" src="${params.value}" style="height: 40px; width: 40px; object-fit: cover;" />`;
-    },
-    tooltipField: 'cover',
-    tooltipComponent: GridCoverTooltip,
-    minWidth: 80,
-    hide: true,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '摘要',
-    field: 'digest',
-    cellDataType: 'text',
-    filter: 'agTextColumnFilter',
-    tooltipField: 'digest',
-    minWidth: 200,
-    initialHide: true,
-  },
-  {
-    headerName: '创建时间',
-    field: 'create_time',
-    valueFormatter: p => (p.value ? formatTimeStamp(p.value) : '--'),
-    filter: 'agDateColumnFilter',
-    filterParams: createDateColumnFilterParams(),
-    filterValueGetter: (params: ValueGetterParams) => {
-      const value = params.getValue('create_time');
-      if (value && typeof value === 'number' && value > 0) {
-        // 判断是秒级还是毫秒级时间戳（10位是秒，13位是毫秒）
-        const timestamp = value < 10000000000 ? value * 1000 : value;
-        return new Date(timestamp);
-      }
-      return null;
-    },
-    minWidth: 180,
-    initialHide: true,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '发布时间',
-    field: 'update_time',
-    valueFormatter: p => (p.value ? formatTimeStamp(p.value) : '--'),
-    filter: 'agDateColumnFilter',
-    filterParams: createDateColumnFilterParams(),
-    filterValueGetter: (params: ValueGetterParams) => {
-      const value = params.getValue('update_time');
-      if (value && typeof value === 'number' && value > 0) {
-        // 判断是秒级还是毫秒级时间戳（10位是秒，13位是毫秒）
-        const timestamp = value < 10000000000 ? value * 1000 : value;
-        return new Date(timestamp);
-      }
-      return null;
-    },
-    minWidth: 180,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '是否已删除',
-    field: 'is_deleted',
-    cellDataType: 'boolean',
-    filter: 'agSetColumnFilter',
-    filterParams: createBooleanColumnFilterParams('已删除', '未删除'),
-    minWidth: 150,
-    initialHide: true,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '文章状态',
-    field: '_status',
-    valueFormatter: p => p.value,
-    filter: 'agSetColumnFilter',
-    filterParams: {
-      valueFormatter: (p: ValueFormatterParams) => p.value,
-    },
-    minWidth: 150,
-    initialHide: true,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '内容已下载',
-    field: 'contentDownload',
-    cellDataType: 'boolean',
-    filter: 'agSetColumnFilter',
-    filterParams: createBooleanColumnFilterParams('已下载', '未下载'),
-    minWidth: 150,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    field: 'commentDownload',
-    headerName: '留言已下载',
-    cellDataType: 'boolean',
-    filter: 'agSetColumnFilter',
-    filterParams: createBooleanColumnFilterParams('已下载', '未下载'),
-    minWidth: 150,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '阅读',
-    field: 'readNum',
-    cellDataType: 'number',
-    filter: 'agNumberColumnFilter',
-    minWidth: 100,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '点赞',
-    field: 'oldLikeNum',
-    cellDataType: 'number',
-    filter: 'agNumberColumnFilter',
-    minWidth: 100,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '分享',
-    field: 'shareNum',
-    cellDataType: 'number',
-    filter: 'agNumberColumnFilter',
-    minWidth: 100,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '喜欢',
-    field: 'likeNum',
-    cellDataType: 'number',
-    filter: 'agNumberColumnFilter',
-    minWidth: 100,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '留言',
-    field: 'commentNum',
-    cellDataType: 'number',
-    filter: 'agNumberColumnFilter',
-    minWidth: 100,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    field: 'author_name',
-    headerName: '作者',
-    cellDataType: 'text',
-    filter: 'agSetColumnFilter',
-    minWidth: 150,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '是否原创',
-    valueGetter: p => p.data && p.data.copyright_stat === 1 && p.data.copyright_type === 1,
-    cellDataType: 'boolean',
-    filter: 'agSetColumnFilter',
-    filterParams: createBooleanColumnFilterParams('原创', '非原创'),
-    minWidth: 150,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '是否付费',
-    field: 'is_pay_subscribe',
-    valueGetter: p => p.data && p.data.is_pay_subscribe === 1,
-    cellDataType: 'boolean',
-    filter: 'agSetColumnFilter',
-    filterParams: createBooleanColumnFilterParams('付费', '免费'),
-    minWidth: 150,
-    initialHide: true,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '付费金额',
-    field: 'wecoin_count',
-    valueFormatter: p => (p.value ? `${p.value} 微币` : ''),
-    cellDataType: 'number',
-    filter: 'agNumberColumnFilter',
-    minWidth: 120,
-    initialHide: true,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '文章类型',
-    field: 'item_show_type',
-    valueFormatter: p => formatItemShowType(p.value),
-    filter: 'agSetColumnFilter',
-    filterParams: {
-      valueFormatter: (p: ValueFormatterParams) => formatItemShowType(p.value),
-    },
-    minWidth: 150,
-    initialHide: true,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '媒体时长',
-    field: 'media_duration',
-    valueGetter: params => durationToSeconds(params.data.media_duration), // 用于排序和过滤
-    valueFormatter: params => params.data.media_duration,
-    filter: 'agNumberColumnFilter',
-    comparator: (a, b) => a - b,
-    minWidth: 150,
-    initialHide: true,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-  {
-    headerName: '所属合集',
-    field: 'appmsg_album_infos',
-    cellRenderer: GridAlbum,
-    sortable: false,
-    filter: false,
-    valueFormatter: p =>
-      p.value && Array.isArray(p.value) ? p.value.map((album: any) => album.title).join(',') : '--',
-    minWidth: 150,
-    initialHide: true,
-  },
-  {
-    headerName: '操作',
-    field: 'link',
-    sortable: false,
-    filter: false,
-    cellRenderer: GridArticleActions,
-    cellRendererParams: {
-      onPreview: (params: ICellRendererParams) => {
-        preview(params.data);
-      },
-      onGotoLink: (params: ICellRendererParams) => {
-        window.open(params.value, '_blank');
-      },
-    },
-    maxWidth: 100,
-    pinned: 'right',
-    cellClass: 'flex justify-center items-center',
-  },
-]);
-
-// 注意，`defu`函数最左边的参数优先级最高
-const gridOptions: GridOptions = defu(
-  {
-    getRowId: (params: GetRowIdParams) => `${params.data.fakeid}:${params.data.aid}`,
-    statusBar: {
-      statusPanels: [
-        {
-          statusPanel: GridStatusBar,
-          align: 'left',
-        },
-      ],
-    },
-  },
-  sharedGridOptions
-);
-
-const gridApi = shallowRef<GridApi | null>(null);
-function onGridReady(params: GridReadyEvent) {
-  gridApi.value = params.api;
-
-  restoreColumnState();
+function onSelectionChange(val: Article[]) {
+  selectedRows.value = val;
 }
 
-function onColumnStateChange() {
-  if (gridApi.value) {
-    saveColumnState();
-  }
-}
-function saveColumnState() {
-  const state = gridApi.value?.getColumnState();
-  localStorage.setItem('agGridColumnState', JSON.stringify(state));
+function onFilterChange() {
+  // 过滤变化时清空选择，避免对隐藏行执行批量操作
+  tableRef.value?.clearSelection();
 }
 
-function restoreColumnState() {
-  const stateStr = localStorage.getItem('agGridColumnState');
-  if (stateStr) {
-    const state = JSON.parse(stateStr);
-    gridApi.value?.applyColumnState({
-      state,
-      applyOrder: true,
-    });
-  }
-}
-
-function onFilterChanged(event: FilterChangedEvent) {
-  event.api.deselectAll();
+// row-key：沿用 AG Grid 的 `${fakeid}:${aid}` 格式
+function getRowKey(row: Article) {
+  return `${row.fakeid}:${row.aid}`;
 }
 
 const preferences = usePreferences();
@@ -430,6 +112,12 @@ const previewArticleRef = ref<typeof PreviewArticle | null>(null);
 
 function preview(article: Article) {
   previewArticleRef.value!.open(article);
+}
+
+function onGotoLink(row: Article) {
+  if (row.link) {
+    window.open(row.link, '_blank', 'noopener');
+  }
 }
 
 // 保留原有的 loading 状态（用于表格加载动画）
@@ -514,12 +202,7 @@ async function refresh() {
     }
 
     await sleep(200);
-    globalRowData = articles.filter(article => (hideDeleted.value ? !article.is_deleted : true));
-    gridApi.value?.setGridOption('rowData', globalRowData);
-
-	    // 数据加载后重新应用列状态（避免列顺序被重置）
-	    await nextTick();
-	    restoreColumnState();
+    globalRowData.value = articles.filter(article => (hideDeleted.value ? !article.is_deleted : true));
   } catch (error: any) {
     console.error('加载文章列表失败:', error);
   } finally {
@@ -528,9 +211,9 @@ async function refresh() {
 }
 
 function updateRow(article: Article) {
-  const rowNode = gridApi.value?.getRowNode(`${article.fakeid}:${article.aid}`);
-  if (rowNode) {
-    rowNode.updateData(article);
+  const idx = globalRowData.value.findIndex(r => r.fakeid === article.fakeid && r.aid === article.aid);
+  if (idx >= 0) {
+    globalRowData.value[idx] = { ...article };
   }
 }
 
@@ -590,7 +273,7 @@ async function selectArticleFromSearch(article: any) {
     }
 
     // 防重复
-    if (globalRowData.some(r => r.key === key || r.link === link)) {
+    if (globalRowData.value.some(r => r.key === key || r.link === link)) {
       toast.info('提示', '该文章已在列表中');
       return;
     }
@@ -604,8 +287,8 @@ async function selectArticleFromSearch(article: any) {
       cover: article.cover || '',
       digest: article.digest || '',
       author: article.author || article.account_nickname || '',
-      create_time: (article.create_time && article.create_time > 0) ? article.create_time : null,
-      update_time: (article.create_time && article.create_time > 0) ? article.create_time : null,
+      create_time: article.create_time && article.create_time > 0 ? article.create_time : null,
+      update_time: article.create_time && article.create_time > 0 ? article.create_time : null,
       datetime: article.create_time_formatted || '',
       downloaded: false,
       is_deleted: false,
@@ -648,9 +331,7 @@ async function selectArticleFromSearch(article: any) {
     searchKeyword.value = '';
 
     // 3. 同步插入到列表头部 + 刷新表格
-    globalRowData.unshift(newRow);
-    await nextTick();
-    gridApi.value?.setGridOption('rowData', globalRowData);
+    globalRowData.value = [newRow, ...globalRowData.value];
 
     toast.success('已添加', `"${newRow.title}" 已添加到列表，正在抓取正文...`);
 
@@ -674,10 +355,7 @@ function handlePageInput() {
   inputPage.value = currentPage.value;
 }
 
-const selectedArticles = shallowRef<Article[]>([]);
-function onSelectionChanged(event: SelectionChangedEvent) {
-  selectedArticles.value = (event.selectedNodes || []).map(node => node.data);
-}
+const selectedArticles = computed(() => selectedRows.value);
 const selectedArticleUrls = computed(() => {
   return selectedArticles.value.map(article => article.link);
 });
@@ -693,7 +371,7 @@ const {
   stop: stopDownload,
 } = useDownloader({
   onContent(url: string) {
-    const article = globalRowData.find(article => article.link === url);
+    const article = globalRowData.value.find(article => article.link === url);
     if (article) {
       article.contentDownload = true;
       article._status = '正常';
@@ -715,7 +393,7 @@ const {
     }
   },
   onStatusChange(url: string, status: string) {
-    const article = globalRowData.find(article => article.link === url);
+    const article = globalRowData.value.find(article => article.link === url);
     if (article) {
       article._status = status;
       updateRow(article);
@@ -723,7 +401,7 @@ const {
     }
   },
   onDelete(url: string) {
-    const article = globalRowData.find(article => article.link === url);
+    const article = globalRowData.value.find(article => article.link === url);
     if (article) {
       article.is_deleted = true;
       article._status = '已删除';
@@ -737,7 +415,7 @@ const {
     }
   },
   onMetadata(url: string, metadata: Metadata) {
-    const article = globalRowData.find(article => article.link === url);
+    const article = globalRowData.value.find(article => article.link === url);
     if (article) {
       article.readNum = metadata.readNum;
       article.oldLikeNum = metadata.oldLikeNum;
@@ -769,7 +447,7 @@ const {
     }
   },
   onComment(url: string) {
-    const article = globalRowData.find(article => article.link === url);
+    const article = globalRowData.value.find(article => article.link === url);
     if (article) {
       article.commentDownload = true;
       updateRow(article);
@@ -853,7 +531,7 @@ async function executeExport() {
       url: article.link,
       title: article.title,
       fakeid: article.fakeid,
-      accountName: article.account_nickname || '未知公众号'
+      accountName: article.account_nickname || '未知公众号',
     }));
 
     // 导出格式映射
@@ -867,16 +545,11 @@ async function executeExport() {
     const exportFormat = formatMap[format] || 'markdown';
 
     // 调用服务端导出
-    const result = await exportArticlesToServer(
-      articles,
-      exportFormat,
-      exportPath,
-      (current, total) => {
-        exportCompletedCount.value = current;
-        exportTotalCount.value = total;
-        exportPhase.value = `导出中 ${current}/${total}`;
-      }
-    );
+    const result = await exportArticlesToServer(articles, exportFormat, exportPath, (current, total) => {
+      exportCompletedCount.value = current;
+      exportTotalCount.value = total;
+      exportPhase.value = `导出中 ${current}/${total}`;
+    });
 
     if (result.success) {
       toast.success('导出成功', result.message);
@@ -1059,21 +732,217 @@ function copyWechatLink() {
       </div>
 
       <!-- 数据表格 -->
-      <ag-grid-vue
-        v-else
-        style="width: 100%; height: 100%"
-        :loading="tableLoading"
-        :rowData="globalRowData"
-        :columnDefs="columnDefs"
-        :gridOptions="gridOptions"
-        @grid-ready="onGridReady"
-        @filter-changed="onFilterChanged"
-        @column-moved="onColumnStateChange"
-        @column-visible="onColumnStateChange"
-        @column-pinned="onColumnStateChange"
-        @column-resized="onColumnStateChange"
-        @selection-changed="onSelectionChanged"
-      ></ag-grid-vue>
+      <div v-else class="flex-1 flex flex-col overflow-hidden">
+        <ElTable
+          ref="tableRef"
+          v-loading="tableLoading"
+          :data="globalRowData"
+          stripe
+          border
+          height="100%"
+          style="width: 100%"
+          :row-key="getRowKey"
+          @selection-change="onSelectionChange"
+          @filter-change="onFilterChange"
+        >
+          <ElTableColumn type="selection" width="55" fixed="left" reserve-selection />
+
+          <!-- 1. ID -->
+          <ElTableColumn prop="aid" label="ID" min-width="120" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.aid }}</span>
+            </template>
+          </ElTableColumn>
+
+          <!-- 2. 公众号 -->
+          <ElTableColumn prop="account_nickname" label="公众号" min-width="120" sortable>
+            <template #default="{ row }">
+              {{ row.account_nickname || '--' }}
+            </template>
+          </ElTableColumn>
+
+          <!-- 3. 链接 -->
+          <ElTableColumn prop="link" label="链接" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.link }}</span>
+            </template>
+          </ElTableColumn>
+
+          <!-- 4. 标题 -->
+          <ElTableColumn prop="title" label="标题" min-width="200" sortable show-overflow-tooltip />
+
+          <!-- 5. 封面 -->
+          <ElTableColumn label="封面" width="80">
+            <template #default="{ row }">
+              <ElPopover v-if="row.cover" placement="top" trigger="hover" :width="300">
+                <template #reference>
+                  <img :src="row.cover" class="size-10 rounded" />
+                </template>
+                <img :src="row.cover" class="w-[300px]" />
+              </ElPopover>
+            </template>
+          </ElTableColumn>
+
+          <!-- 6. 摘要 -->
+          <ElTableColumn prop="digest" label="摘要" min-width="200" show-overflow-tooltip />
+
+          <!-- 7. 创建时间 -->
+          <ElTableColumn prop="create_time" label="创建时间" min-width="180" sortable>
+            <template #default="{ row }">
+              {{ row.create_time ? formatTimeStamp(row.create_time) : '--' }}
+            </template>
+          </ElTableColumn>
+
+          <!-- 8. 发布时间 -->
+          <ElTableColumn prop="update_time" label="发布时间" min-width="180" sortable>
+            <template #default="{ row }">
+              {{ row.update_time ? formatTimeStamp(row.update_time) : '--' }}
+            </template>
+          </ElTableColumn>
+
+          <!-- 9. 是否已删除 -->
+          <ElTableColumn label="是否已删除" min-width="120" sortable
+            :filters="[{ text: '已删除', value: 'true' }, { text: '未删除', value: 'false' }]"
+            :filter-method="(value: string, row: Article) => String(!!row.is_deleted) === value"
+          >
+            <template #default="{ row }">
+              <ElTag :type="row.is_deleted ? 'danger' : 'success'" size="small">
+                {{ row.is_deleted ? '已删除' : '未删除' }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+
+          <!-- 10. 文章状态 -->
+          <ElTableColumn prop="_status" label="文章状态" min-width="120" sortable />
+
+          <!-- 11. 内容已下载 -->
+          <ElTableColumn label="内容已下载" min-width="120" sortable
+            :filters="[{ text: '已下载', value: 'true' }, { text: '未下载', value: 'false' }]"
+            :filter-method="(value: string, row: Article) => String(row.contentDownload) === value"
+          >
+            <template #default="{ row }">
+              <ElTag :type="row.contentDownload ? 'success' : 'info'" size="small">
+                {{ row.contentDownload ? '已下载' : '未下载' }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+
+          <!-- 12. 留言已下载 -->
+          <ElTableColumn label="留言已下载" min-width="120" sortable
+            :filters="[{ text: '已下载', value: 'true' }, { text: '未下载', value: 'false' }]"
+            :filter-method="(value: string, row: Article) => String(row.commentDownload) === value"
+          >
+            <template #default="{ row }">
+              <ElTag :type="row.commentDownload ? 'success' : 'info'" size="small">
+                {{ row.commentDownload ? '已下载' : '未下载' }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+
+          <!-- 13. 阅读 -->
+          <ElTableColumn prop="readNum" label="阅读" min-width="100" sortable>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.readNum }}</span>
+            </template>
+          </ElTableColumn>
+
+          <!-- 14. 点赞 -->
+          <ElTableColumn prop="oldLikeNum" label="点赞" min-width="100" sortable>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.oldLikeNum }}</span>
+            </template>
+          </ElTableColumn>
+
+          <!-- 15. 分享 -->
+          <ElTableColumn prop="shareNum" label="分享" min-width="100" sortable>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.shareNum }}</span>
+            </template>
+          </ElTableColumn>
+
+          <!-- 16. 喜欢 -->
+          <ElTableColumn prop="likeNum" label="喜欢" min-width="100" sortable>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.likeNum }}</span>
+            </template>
+          </ElTableColumn>
+
+          <!-- 17. 留言 -->
+          <ElTableColumn prop="commentNum" label="留言" min-width="100" sortable>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.commentNum }}</span>
+            </template>
+          </ElTableColumn>
+
+          <!-- 18. 作者 -->
+          <ElTableColumn prop="author_name" label="作者" min-width="120" sortable />
+
+          <!-- 19. 是否原创 -->
+          <ElTableColumn label="是否原创" min-width="100" sortable
+            :filters="[{ text: '原创', value: 'true' }, { text: '非原创', value: 'false' }]"
+            :filter-method="(value: string, row: Article) => String(row.copyright_stat === 1 && row.copyright_type === 1) === value"
+          >
+            <template #default="{ row }">
+              <ElTag :type="row.copyright_stat === 1 && row.copyright_type === 1 ? 'success' : 'info'" size="small">
+                {{ row.copyright_stat === 1 && row.copyright_type === 1 ? '原创' : '非原创' }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+
+          <!-- 20. 是否付费 -->
+          <ElTableColumn label="是否付费" min-width="100" sortable
+            :filters="[{ text: '付费', value: 'true' }, { text: '免费', value: 'false' }]"
+            :filter-method="(value: string, row: Article) => String(row.is_pay_subscribe === 1) === value"
+          >
+            <template #default="{ row }">
+              <ElTag :type="row.is_pay_subscribe === 1 ? 'warning' : 'info'" size="small">
+                {{ row.is_pay_subscribe === 1 ? '付费' : '免费' }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+
+          <!-- 21. 付费金额 -->
+          <ElTableColumn prop="wecoin_count" label="付费金额" min-width="100">
+            <template #default="{ row }">
+              {{ row.wecoin_count ? row.wecoin_count + ' 微币' : '--' }}
+            </template>
+          </ElTableColumn>
+
+          <!-- 22. 文章类型 -->
+          <ElTableColumn prop="item_show_type" label="文章类型" min-width="120">
+            <template #default="{ row }">
+              {{ formatItemShowType(row.item_show_type) }}
+            </template>
+          </ElTableColumn>
+
+          <!-- 23. 媒体时长 -->
+          <ElTableColumn label="媒体时长" min-width="100" sortable :sort-method="(a: Article, b: Article) => durationToSeconds(a.media_duration) - durationToSeconds(b.media_duration)">
+            <template #default="{ row }">
+              {{ row.media_duration || '--' }}
+            </template>
+          </ElTableColumn>
+
+          <!-- 24. 所属合集 -->
+          <ElTableColumn label="所属合集" min-width="150">
+            <template #default="{ row }">
+              <GridAlbum v-if="row.appmsg_album_infos?.length" :data="row" />
+              <span v-else>--</span>
+            </template>
+          </ElTableColumn>
+
+          <!-- 25. 操作 -->
+          <ElTableColumn label="操作" width="110" fixed="right">
+            <template #default="{ row }">
+              <GridArticleActions :data="row" :on-preview="preview" :on-goto-link="onGotoLink" />
+            </template>
+          </ElTableColumn>
+        </ElTable>
+
+        <!-- 状态栏：已选 X/Y -->
+        <div class="text-sm text-gray-500 px-3 py-1">
+          已选 {{ selectedRows.length }} / {{ globalRowData.length }} 条
+        </div>
+      </div>
 
       <!-- 分页 -->
       <div

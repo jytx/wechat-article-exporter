@@ -1,20 +1,28 @@
 <script setup lang="ts">
 	import type { ICellRendererParams } from 'ag-grid-community';
 
+	interface LoadValue {
+	  count?: number;
+	  total?: number;
+	}
+
 	interface Props {
-	  params: ICellRendererParams;
+	  // AG Grid 旧用法
+	  params?: ICellRendererParams;
+	  // el-table 新用法（直接传 { count, total }）
+	  value?: LoadValue;
 	}
 	const props = defineProps<Props>();
 
-	// valueGetter 返回 { count, total }
-	const count = ref(props.params.value?.count || 0);
-	const total = ref(props.params.value?.total || 0);
-
-	function refresh(params: ICellRendererParams): boolean {
-	  count.value = params.value?.count || 0;
-	  total.value = params.value?.total || 0;
-	  return true;
-	}
+	// 兼容两种入参：优先取 value，回退到 params.value
+	const count = computed(() => {
+	  if (props.value !== undefined) return props.value.count || 0;
+	  return (props.params?.value as LoadValue | undefined)?.count || 0;
+	});
+	const total = computed(() => {
+	  if (props.value !== undefined) return props.value.total || 0;
+	  return (props.params?.value as LoadValue | undefined)?.total || 0;
+	});
 	</script>
 
 	<template>

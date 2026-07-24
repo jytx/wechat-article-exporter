@@ -1,16 +1,4 @@
 <script setup lang="ts">
-	import type {
-	  ColDef,
-	  GetRowIdParams,
-	  GridApi,
-	  GridOptions,
-	  GridReadyEvent,
-	  ICellRendererParams,
-	  SelectionChangedEvent,
-	  ValueGetterParams,
-	} from 'ag-grid-community';
-	import { AgGridVue } from 'ag-grid-vue3';
-	import { defu } from 'defu';
 	import { formatTimeStamp } from '#shared/utils/helpers';
 	import GlobalSearchAccountDialog from '~/components/global/SearchAccountDialog.vue';
 	import BatchSearchAccounts from '~/components/dashboard/BatchSearchAccounts.vue';
@@ -21,11 +9,7 @@
 	import toastFactory from '~/composables/toast';
 	import useLoginCheck from '~/composables/useLoginCheck';
 	import { IMAGE_PROXY, websiteName } from '~/config';
-	import { sharedGridOptions } from '~/config/shared-grid-options';
-	import type { AccountManifest } from '~/types/account';
 	import type { Preferences } from '~/types/preferences';
-	import { exportAccountJsonFile } from '~/utils/exporter';
-	import { createBooleanColumnFilterParams, createDateColumnFilterParams } from '~/utils/grid';
 	// 新增：使用新的 API
 	import { useAccountApiWithState } from '~/composables/useAccountApi';
 	import type { Account } from '~/types/api';
@@ -423,177 +407,19 @@
 	// 数据行数据
 	const globalRowData = ref<Account[]>([]);
 
-	const columnDefs = ref<ColDef[]>([
-	  {
-	    colId: 'fakeid',
-	    headerName: 'fakeid',
-	    field: 'fakeid',
-	    cellDataType: 'text',
-	    filter: 'agTextColumnFilter',
-	    minWidth: 200,
-	    cellClass: 'font-mono',
-	    initialHide: true,
-	  },
-	  {
-	    colId: 'round_head_img',
-	    headerName: '头像',
-	    field: 'round_head_img',
-	    sortable: false,
-	    filter: false,
-	    cellRenderer: (params: ICellRendererParams) => {
-	      return `<img alt="" src="${IMAGE_PROXY + params.value}" style="height: 30px; width: 30px; object-fit: cover; border: 1px solid #e5e7eb; border-radius: 100%;" />`;
-	    },
-	    cellClass: 'flex justify-center items-center',
-	    minWidth: 80,
-	  },
-	  {
-	    colId: 'nickname',
-	    headerName: '名称',
-	    field: 'nickname',
-	    cellDataType: 'text',
-	    filter: 'agTextColumnFilter',
-	    tooltipField: 'nickname',
-	    minWidth: 200,
-	  },
-	  {
-	    colId: 'create_time',
-	    headerName: '添加时间',
-	    field: 'create_time',
-	    valueFormatter: p => (p.value ? formatTimeStamp(p.value) : ''),
-	    filter: 'agDateColumnFilter',
-	    filterParams: createDateColumnFilterParams(),
-	    filterValueGetter: (params: ValueGetterParams) => {
-	      const value = params.getValue('create_time');
-	      if (value && typeof value === 'number' && value > 0) {
-	        // 判断是秒级还是毫秒级时间戳（10位是秒，13位是毫秒）
-	        const timestamp = value < 10000000000 ? value * 1000 : value;
-	        return new Date(timestamp);
-	      }
-	      return null;
-	    },
-	    sort: 'desc',
-	    minWidth: 180,
-	    initialHide: true,
-	    cellClass: 'flex justify-center items-center font-mono',
-	  },
-	  {
-	    colId: 'update_time',
-	    headerName: '最后更新时间',
-	    field: 'update_time',
-	    valueFormatter: p => (p.value ? formatTimeStamp(p.value) : ''),
-	    filter: 'agDateColumnFilter',
-	    filterParams: createDateColumnFilterParams(),
-	    filterValueGetter: (params: ValueGetterParams) => {
-	      const value = params.getValue('update_time');
-	      if (value && typeof value === 'number' && value > 0) {
-	        // 判断是秒级还是毫秒级时间戳（10位是秒，13位是毫秒）
-	        const timestamp = value < 10000000000 ? value * 1000 : value;
-	        return new Date(timestamp);
-	      }
-	      return null;
-	    },
-	    minWidth: 180,
-	    cellClass: 'flex justify-center items-center font-mono',
-	  },
-	  {
-	    colId: 'total_count',
-	    headerName: '消息总数*',
-	    field: 'total_count',
-	    cellDataType: 'number',
-	    cellRenderer: 'agAnimateShowChangeCellRenderer',
-	    filter: 'agNumberColumnFilter',
-	    cellClass: 'flex justify-center items-center font-mono',
-	    minWidth: 150,
-	    headerTooltip: '消息总数（同步前为微信API预估，同步完成后更新为实际可获取数量）',
-	  },
-	  {
-	    colId: 'synced_count',
-	    headerName: '已同步文章数',
-	    field: 'synced_count',
-	    cellDataType: 'number',
-	    cellRenderer: 'agAnimateShowChangeCellRenderer',
-	    filter: 'agNumberColumnFilter',
-	    cellClass: 'flex justify-center items-center font-mono',
-	    minWidth: 150,
-	  },
-	  {
-	    colId: 'load_percent',
-	    headerName: '同步进度',
-	    valueGetter: params => {
-      const total = params.data.total_count || 0;
-      const synced = params.data.synced_count || 0;
-      return {
-        count: synced,
-        total: total
-      };
-    },
-	    cellDataType: 'object',
-	    cellRenderer: GridLoadProgress,
-	    filter: 'agNumberColumnFilter',
-	    cellClass: 'flex items-center',
-	    minWidth: 200,
-	  },
-	  {
-	    colId: 'completed',
-	    headerName: '同步完成',
-	    valueGetter: params => {
-      const total = params.data.total_count || 0;
-      const synced = params.data.synced_count || 0;
-      return total > 0 && synced >= total;
-    },
-	    cellDataType: 'boolean',
-	    filter: 'agSetColumnFilter',
-	    filterParams: createBooleanColumnFilterParams('已完成', '进行中'),
-	    cellClass: 'flex justify-center items-center',
-	    headerClass: 'justify-center',
-	    minWidth: 150,
-	  },
-	  {
-	    colId: 'action',
-	    headerName: '操作',
-	    field: 'fakeid',
-	    sortable: false,
-	    filter: false,
-	    cellRenderer: GridAccountActions,
-	    cellRendererParams: {
-	      onSync: (params: ICellRendererParams) => {
-	        // 后台任务模式：触发后立即返回，进度通过轮询获取，切页面不中断
-	        loadAccountArticle(params.data);
-	      },
-	      onStop: (params: ICellRendererParams) => {
-	        // 单行取消：只停这一行的同步任务，不影响其他
-	        cancelSync(params.data.fakeid);
-	      },
-	      isDeleting: isDeleting,
-	      isSyncing: isSyncing,
-	      syncingRowId: syncingRowId,
-	      syncingFakeids: syncingFakeids,
-	      taskStatusMap: taskStatusMap,
-	      syncProgressMap: syncProgressMap,
-	    },
-	    cellClass: 'flex justify-center items-center',
-	    minWidth: 160,
-	    maxWidth: 200,
-	    pinned: 'right',
-	  },
-	]);
+	// el-table 引用与选中行
+	const tableRef = ref();
+	const selectedRows = ref<Account[]>([]);
 
-	// 注意，`defu`函数最左边的参数优先级最高
-	const gridOptions: GridOptions = defu(
-	  {
-	    getRowId: (params: GetRowIdParams) => String(params.data.fakeid),
-	  },
-	  sharedGridOptions
-	);
+	function onSelectionChange(val: Account[]) {
+	  selectedRows.value = val;
+	}
 
-	const gridApi = shallowRef<GridApi | null>(null);
-	function onGridReady(params: GridReadyEvent) {
-	  gridApi.value = params.api;
+	// 当前是否有选中的行
+	const hasSelectedRows = computed(() => selectedRows.value.length > 0);
 
-	  restoreColumnState();
-	  refresh();
-	  // 恢复可能有正在运行的后台同步任务（切页面后回来）
-	  restoreActiveSyncTasks();
+	function getSelectedRows(): Account[] {
+	  return selectedRows.value;
 	}
 
 	/**
@@ -622,27 +448,6 @@
 	  }
 	}
 
-	function onColumnStateChange() {
-	  if (gridApi.value) {
-	    saveColumnState();
-	  }
-	}
-	function saveColumnState() {
-	  const state = gridApi.value?.getColumnState();
-	  localStorage.setItem('agGridColumnState-account', JSON.stringify(state));
-	}
-
-	function restoreColumnState() {
-	  const stateStr = localStorage.getItem('agGridColumnState-account');
-	  if (stateStr) {
-	    const state = JSON.parse(stateStr);
-	    gridApi.value?.applyColumnState({
-	      state,
-	      applyOrder: true,
-	    });
-	  }
-	}
-
 	// 修改：使用新的 API 加载数据
 	async function refresh() {
 	  // 防止重复加载
@@ -656,8 +461,6 @@
 	    globalRowData.value = result.items;
 	    // 标记初始化完成
 	    isInitialized.value = true;
-	    // 不要同时调用 setGridOption，让 AG Grid 自动响应 ref 的变化
-	    // gridApi.value?.setGridOption('rowData', globalRowData.value);
 	  } catch (error: any) {
 	    console.error('加载公众号列表失败:', error);
 	    toast.error('加载失败', error.message);
@@ -666,36 +469,42 @@
 	  }
 	}
 
+	/**
+	 * 单行更新：通过 fakeid 找到行，用 API 拉取最新数据后替换。
+	 */
 	async function updateRow(fakeid: string) {
-	  const rowNode = gridApi.value?.getRowNode(fakeid);
-	  if (rowNode) {
-	    // 使用 API 获取最新数据
-	    try {
-	      const account = await accountApi.fetchAccount(fakeid);
-	      console.log(`[updateRow] fakeid: ${fakeid}, synced_count: ${account.synced_count}, total_count: ${account.total_count}`);
-
-	      // 使用 setData 更新数据（AG Grid 推荐的单行更新方法）
-	      rowNode.setData(account);
-	    } catch (error) {
-	      console.error('更新行数据失败:', fakeid, error);
+	  try {
+	    const account = await accountApi.fetchAccount(fakeid);
+	    console.log(`[updateRow] fakeid: ${fakeid}, synced_count: ${account.synced_count}, total_count: ${account.total_count}`);
+	    const idx = globalRowData.value.findIndex(r => r.fakeid === fakeid);
+	    if (idx >= 0) {
+	      globalRowData.value[idx] = account;
 	    }
+	  } catch (error) {
+	    console.error('更新行数据失败:', fakeid, error);
 	  }
 	}
 
-	// 当前是否有选中的行
-	const hasSelectedRows = ref(false);
-	function onSelectionChanged(evt: SelectionChangedEvent) {
-	  hasSelectedRows.value = (evt.selectedNodes?.map(node => node.data) || []).length > 0;
+	/**
+	 * 为 AccountActions 组件构造操作上下文。
+	 * 将回调与共享状态打包，供 el-table 行内的同步/停止按钮使用。
+	 */
+	function buildActionContext() {
+	  return {
+	    isDeleting: isDeleting.value,
+	    isSyncing: isSyncing.value,
+	    syncingRowId: syncingRowId.value,
+	    syncingFakeids: syncingFakeids.value,
+	    taskStatusMap: taskStatusMap.value,
+	    syncProgressMap: syncProgressMap.value,
+	  };
 	}
-	function getSelectedRows() {
-	  const rows: Account[] = [];
-	  gridApi.value?.forEachNodeAfterFilterAndSort(node => {
-	    if (node.isSelected()) {
-	      rows.push(node.data);
-	    }
-	  });
-	  return rows;
-	}
+
+	// 挂载后：首次加载数据并恢复可能的后台同步任务
+	onMounted(() => {
+	  refresh();
+	  restoreActiveSyncTasks();
+	});
 
 	// 删除所选的公众号数据
 	function deleteSelectedAccounts() {
@@ -907,20 +716,88 @@
 	        </div>
 	      </div>
 
-	      <!-- 数据表格 -->
-	      <ag-grid-vue
-	        style="width: 100%; height: 100%"
-	        :rowData="globalRowData"
-	        :columnDefs="columnDefs"
-	        :gridOptions="gridOptions"
-	        @grid-ready="onGridReady"
-	        @selection-changed="onSelectionChanged"
-	        @column-moved="onColumnStateChange"
-	        @column-visible="onColumnStateChange"
-	        @column-pinned="onColumnStateChange"
-	        @column-resized="onColumnStateChange"
-	      ></ag-grid-vue>
-	    </div>
+      <!-- 数据表格 -->
+      <div class="flex-1 overflow-hidden p-2">
+        <ElTable
+          ref="tableRef"
+          :data="globalRowData"
+          stripe
+          border
+          height="100%"
+          style="width: 100%"
+          row-key="fakeid"
+          @selection-change="onSelectionChange"
+        >
+          <ElTableColumn type="selection" width="55" fixed="left" reserve-selection />
+          <!-- 1. fakeid -->
+          <ElTableColumn prop="fakeid" label="fakeid" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.fakeid }}</span>
+            </template>
+          </ElTableColumn>
+          <!-- 2. 头像 -->
+          <ElTableColumn label="头像" width="80">
+            <template #default="{ row }">
+              <img :src="IMAGE_PROXY + row.round_head_img" class="size-8 rounded-full object-cover border border-gray-200" alt="" />
+            </template>
+          </ElTableColumn>
+          <!-- 3. 名称 -->
+          <ElTableColumn prop="nickname" label="名称" min-width="200" sortable show-overflow-tooltip />
+          <!-- 4. 添加时间 -->
+          <ElTableColumn prop="create_time" label="添加时间" min-width="180" sortable>
+            <template #default="{ row }">
+              {{ row.create_time ? formatTimeStamp(row.create_time) : '' }}
+            </template>
+          </ElTableColumn>
+          <!-- 5. 最后更新时间 -->
+          <ElTableColumn prop="update_time" label="最后更新时间" min-width="180" sortable>
+            <template #default="{ row }">
+              {{ row.update_time ? formatTimeStamp(row.update_time) : '' }}
+            </template>
+          </ElTableColumn>
+          <!-- 6. 消息总数 -->
+          <ElTableColumn prop="total_count" label="消息总数" min-width="150" sortable>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.total_count }}</span>
+            </template>
+          </ElTableColumn>
+          <!-- 7. 已同步文章数 -->
+          <ElTableColumn prop="synced_count" label="已同步文章数" min-width="150" sortable>
+            <template #default="{ row }">
+              <span class="font-mono">{{ row.synced_count }}</span>
+            </template>
+          </ElTableColumn>
+          <!-- 8. 同步进度 -->
+          <ElTableColumn label="同步进度" min-width="200">
+            <template #default="{ row }">
+              <GridLoadProgress :value="{ count: row.synced_count || 0, total: row.total_count || 0 }" />
+            </template>
+          </ElTableColumn>
+          <!-- 9. 同步完成 -->
+          <ElTableColumn label="同步完成" min-width="150" sortable
+            :filters="[{ text: '已完成', value: 'true' }, { text: '进行中', value: 'false' }]"
+            :filter-method="(val: string, row: Account) => String(row.total_count > 0 && row.synced_count >= row.total_count) === val"
+          >
+            <template #default="{ row }">
+              <ElTag :type="row.total_count > 0 && row.synced_count >= row.total_count ? 'success' : 'info'" size="small">
+                {{ row.total_count > 0 && row.synced_count >= row.total_count ? '已完成' : '进行中' }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+          <!-- 10. 操作 -->
+          <ElTableColumn label="操作" min-width="160" fixed="right">
+            <template #default="{ row }">
+              <GridAccountActions
+                :data="row"
+                :on-sync="loadAccountArticle"
+                :on-stop="(data: any) => cancelSync(data.fakeid)"
+                :context="buildActionContext()"
+              />
+            </template>
+          </ElTableColumn>
+        </ElTable>
+      </div>
+    </div>
 
 	    <!-- 添加公众号弹框 -->
 	    <GlobalSearchAccountDialog ref="searchAccountDialogRef" @select:account="onSelectAccount" />

@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import type { ColDef, GridOptions, GridReadyEvent, ICellRendererParams, ValueFormatterParams, ValueGetterParams } from 'ag-grid-community';
-import { AgGridVue } from 'ag-grid-vue3';
 import { Flame, TrendingUp } from 'lucide-vue-next';
 import { formatTimeStamp } from '#shared/utils/helpers';
-import { sharedGridOptions } from '~/config/shared-grid-options';
 import { websiteName } from '~/config';
 import { useAccountApi, type Account } from '~/composables/useAccountApi';
 import { api } from '~/utils/api-client';
@@ -69,86 +66,6 @@ function applyTrendKeyword(keyword: string) {
   searchKeyword.value = keyword;
   currentPage.value = 1;
   loadRanking();
-}
-
-// ========== AG Grid ==========
-const gridApi = ref<any>(null);
-
-const gridOptions: GridOptions = {
-  ...sharedGridOptions,
-  rowModelType: 'clientSide',
-  rowSelection: undefined,
-};
-
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-const columnDefs = ref<ColDef[]>([
-  {
-    headerName: '标题',
-    field: 'title',
-    cellDataType: 'text',
-    filter: 'agTextColumnFilter',
-    tooltipField: 'title',
-    minWidth: 300,
-    flex: 2,
-    cellRenderer: (params: ICellRendererParams) => {
-      const url = params.data?.link || '';
-      const title = params.value || '无标题';
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-sky-600 hover:text-sky-800 hover:underline line-clamp-2">${escapeHtml(title)}</a>`;
-    },
-  },
-  {
-    headerName: '公众号',
-    field: 'account_nickname',
-    cellDataType: 'text',
-    filter: 'agTextColumnFilter',
-    valueFormatter: p => p.value || '--',
-    width: 140,
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '摘要',
-    field: 'digest',
-    cellDataType: 'text',
-    valueFormatter: (p: ValueFormatterParams) => {
-      const v = p.value || '';
-      return v.length > 60 ? v.substring(0, 60) + '...' : v || '--';
-    },
-    minWidth: 200,
-    flex: 1,
-    cellClass: 'text-gray-500 text-xs',
-  },
-  {
-    headerName: '合集',
-    field: 'is_in_album',
-    cellDataType: 'boolean',
-    width: 90,
-    sortable: false,
-    filter: false,
-    cellRenderer: (params: ICellRendererParams) => {
-      return params.value
-        ? '<span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">合集</span>'
-        : '<span class="text-gray-300">--</span>';
-    },
-    cellClass: 'flex justify-center items-center',
-  },
-  {
-    headerName: '发布时间',
-    field: 'create_time',
-    cellDataType: 'text',
-    sort: 'desc' as const,
-    valueFormatter: p => (p.value ? formatTimeStamp(p.value) : '--'),
-    width: 180,
-    cellClass: 'flex justify-center items-center font-mono',
-  },
-]);
-
-function onGridReady(params: GridReadyEvent) {
-  gridApi.value = params.api;
 }
 
 // ========== 数据加载 ==========
@@ -345,17 +262,55 @@ onMounted(async () => {
       <span class="text-gray-400">按发布时间倒序</span>
     </div>
 
-    <!-- AG Grid 表格 + 底部分页 -->
+    <!-- 表格 + 底部分页 -->
     <div class="flex-1 overflow-hidden flex flex-col">
-      <div class="flex-1 overflow-hidden">
-        <AgGridVue
-          class="ag-theme-quartz h-full w-full"
-          :columnDefs="columnDefs"
-          :rowData="rowData"
-          :gridOptions="gridOptions"
-          :loading="loading"
-          @grid-ready="onGridReady"
-        />
+      <div class="flex-1 overflow-auto">
+        <ElTable
+          :data="rowData"
+          v-loading="loading"
+          stripe
+          border
+          style="width: 100%"
+          :default-sort="{ prop: 'create_time', order: 'descending' }"
+        >
+          <el-table-column label="标题" min-width="300">
+            <template #default="{ row }">
+              <a
+                :href="row.link"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-sky-600 hover:text-sky-800 hover:underline line-clamp-2"
+                >{{ row.title }}</a
+              >
+            </template>
+          </el-table-column>
+          <el-table-column label="公众号" width="140">
+            <template #default="{ row }">{{ row.account_nickname || '--' }}</template>
+          </el-table-column>
+          <el-table-column label="摘要" min-width="200">
+            <template #default="{ row }">
+              <span class="text-gray-500 text-xs">{{
+                (row.digest || '').substring(0, 60) + (row.digest?.length > 60 ? '...' : '')
+              }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="合集" width="90">
+            <template #default="{ row }">
+              <ElTag v-if="row.is_in_album" type="primary" size="small">合集</ElTag>
+              <span v-else class="text-gray-300">--</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="发布时间"
+            width="180"
+            prop="create_time"
+            sortable
+          >
+            <template #default="{ row }">
+              <span class="font-mono">{{ formatTimeStamp(row.create_time) }}</span>
+            </template>
+          </el-table-column>
+        </ElTable>
       </div>
 
       <!-- 分页（参考 article.vue 风格，放在表格底部） -->
