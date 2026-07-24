@@ -8,6 +8,7 @@ import GridAlbum from '~/components/grid/Album.vue';
 import GridArticleActions from '~/components/grid/ArticleActions.vue';
 import AccountSelectorForArticle from '~/components/selector/AccountSelectorForArticle.vue';
 import toastFactory from '~/composables/toast';
+import { useAccountApi } from '~/composables/useAccountApi';
 // 新增：使用文章 API
 import { useArticleApiWithState, useArticleFilter } from '~/composables/useArticleApi';
 import { isDev, websiteName } from '~/config';
@@ -126,6 +127,51 @@ const tableLoading = ref(false);
 // 只能选择单个账号
 const selectedAccount = ref<{ fakeid: string; nickname: string; synced_count?: number } | undefined>();
 
+// 已入库的公众号 fakeid 集合（用于判断操作列"加入公众号管理"按钮是否可点）
+const accountApi = useAccountApi();
+const managedFakeids = ref<Set<string>>(new Set());
+
+/** 加载已管理的公众号列表，提取 fakeid 集合 */
+async function loadManagedFakeids() {
+  try {
+    const result = await accountApi.getAccounts({ page: 1, pageSize: 100000 });
+    managedFakeids.value = new Set(result.items.map(a => a.fakeid));
+  } catch {
+    // 静默失败
+  }
+}
+
+/** 判断某篇文章的公众号是否已管理 */
+function isAccountManaged(fakeid: string): boolean {
+  return managedFakeids.value.has(fakeid);
+}
+
+/** 手动将文章所属公众号加入公众号管理 */
+async function addAccountToManage(row: any) {
+  if (!row.fakeid || row.fakeid === 'unknown') {
+    toast.warning('提示', '该文章无法识别公众号信息');
+    return;
+  }
+  try {
+    await $fetch('/api/web/data/v1/batch/save-searched-article', {
+      method: 'POST',
+      body: {
+        article: null,
+        account: {
+          fakeid: row.fakeid,
+          nickname: row.account_nickname || row.author || '未知公众号',
+          round_head_img: row.cover || '',
+        },
+      },
+      credentials: 'include',
+    });
+    managedFakeids.value.add(row.fakeid);
+    toast.success('已添加', '公众号已加入管理列表');
+  } catch (e: any) {
+    toast.error('添加失败', e?.data?.message || e?.message || '添加失败');
+  }
+}
+
 // 修改：使用 API 加载数据
 watch(
   selectedAccount,
@@ -143,6 +189,11 @@ watch(
 watch(currentPage, newPage => {
   setPage(newPage);
   refresh();
+});
+
+// 页面加载时获取已管理的公众号列表
+onMounted(() => {
+  loadManagedFakeids();
 });
 
 // 监控分页数据变化
@@ -287,6 +338,8 @@ async function selectArticleFromSearch(article: any) {
       cover: article.cover || '',
       digest: article.digest || '',
       author: article.author || article.account_nickname || '',
+      // 保存公众号名称，供操作列"加入公众号管理"按钮使用
+      account_nickname: article.account_nickname || article.author || '',
       create_time: article.create_time && article.create_time > 0 ? article.create_time : null,
       update_time: article.create_time && article.create_time > 0 ? article.create_time : null,
       datetime: article.create_time_formatted || '',
@@ -296,7 +349,8 @@ async function selectArticleFromSearch(article: any) {
       appmsg_album_infos: [],
     } as unknown as Article;
 
-    // 1. 入库（文章 + 公众号一起存，用专用接口确保公众号存在）
+    // 1. 文章入库（不再自动入库公众号，改为手动通过操作列按钮添加）
+    //    注意：save-searched-article 的 account 字段传 null，只存文章不存公众号
     try {
       await $fetch('/api/web/data/v1/batch/save-searched-article', {
         method: 'POST',
@@ -313,12 +367,7 @@ async function selectArticleFromSearch(article: any) {
             create_time: newRow.create_time || null,
             datetime: newRow.datetime || '',
           },
-          account: {
-            fakeid: newRow.fakeid,
-            nickname: article.account_nickname || article.author || '未知公众号',
-            round_head_img: article.head_img_url || '',
-            signature: article.profile_description || '',
-          },
+          account: null,
         },
         credentials: 'include',
       });
@@ -903,9 +952,9 @@ function copyWechatLink() {
           </ElTableColumn>
 
           <!-- 25. 操作 -->
-          <ElTableColumn label="操作" width="110" fixed="right">
+          <ElTableColumn label="操作" width="140" fixed="right">
             <template #default="{ row }">
-              <GridArticleActions :data="row" :on-preview="preview" :on-goto-link="onGotoLink" />
+              <GridArticleActions :data="row" :on-preview="preview" :on-goto-link="onGotoLink" :on-add-account="addAccountToManage" :is-account-managed="isAccountManaged" />
             </template>
           </ElTableColumn>
         </ElTable>
