@@ -23,10 +23,10 @@ const items = ref<NavItem[]>([
 
 <template>
   <nav class="flex-1 mt-6">
-    <ul class="flex flex-col gap-2">
+    <ul class="flex flex-col gap-1">
       <li v-for="item in items" :key="item.name">
-        <NuxtLink :to="item.href" class="flex h-8 items-center gap-2 rounded-md px-2 text-sm nav-link">
-          <UIcon :name="item.icon" class="size-5 opacity-80" />
+        <NuxtLink :to="item.href" class="flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm nav-link transition-colors duration-150">
+          <UIcon :name="item.icon" class="size-[18px] opacity-70" />
           <p>{{ item.name }}</p>
           <ElTag v-if="item.tags" v-for="tag in item.tags" type="primary" effect="light">{{ tag }}</ElTag>
         </NuxtLink>
@@ -36,10 +36,20 @@ const items = ref<NavItem[]>([
 </template>
 
 <style scoped>
+/* 苹果风：激活态用浅蓝底 + 蓝色文字；非激活用灰阶，悬停浅灰 */
 .nav-link.router-link-active {
-  @apply text-slate-12 dark:text-slate-200 bg-slate-3 dark:bg-slate-800 font-bold;
+  background-color: rgba(0,113,227,0.08);
+  color: var(--accent, #0071e3);
+  font-weight: 600;
+}
+.nav-link.router-link-active :deep(.iconify) {
+  opacity: 1;
 }
 .nav-link:not(.router-link-active) {
-  @apply text-slate-11 dark:text-slate-200 hover:bg-slate-4 dark:hover:bg-slate-800 hover:text-slate-12;
+  color: var(--text-2, #6e6e73);
+}
+.nav-link:not(.router-link-active):hover {
+  background-color: rgba(0,0,0,0.04);
+  color: var(--text, #1d1d1f);
 }
 </style>

@@ -4,9 +4,9 @@
     <SideBar />
 
     <div class="flex flex-col flex-1 overflow-hidden h-screen">
-      <!-- 顶部操作栏 -->
+      <!-- 顶部操作栏（毛玻璃） -->
       <div
-        class="flex h-[60px] flex-shrink-0 items-center justify-between border-b border-slate-6 dark:border-slate-600 px-6"
+        class="glass-nav flex h-[60px] flex-shrink-0 items-center justify-between px-6"
       >
         <div id="title"></div>
         <GlobalActions />

@@ -26,4 +26,5 @@ if (!isChromeBrowser()) {
 
 <style>
 @import 'style.css';
+@import '~/assets/apple-theme.css';
 </style>
