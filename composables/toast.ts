@@ -1,40 +1,48 @@
-export default () => {
-  const toast = useToast();
+/**
+ * 全局消息提示封装
+ *
+ * 对外签名保持与旧版一致（success/info/warning/error），
+ * 底层从 Nuxt UI useToast 改为 Element Plus ElNotification。
+ */
+import { ElNotification } from 'element-plus';
 
-  function success(title: string, description: string = '') {
-    toast.add({
-      color: 'sky',
+/** 消息显示时长（毫秒），与旧版保持一致 */
+const DURATION: number = 5000;
+
+export default () => {
+  function success(title: string, description: string = ''): void {
+    ElNotification({
+      type: 'success',
       title: title,
-      description: description,
-      icon: 'i-lucide:sparkles',
-      timeout: 5000,
+      message: description || undefined,
+      duration: DURATION,
     });
   }
-  function info(title: string, description: string = '') {
-    toast.add({
-      color: 'gray',
+
+  function info(title: string, description: string = ''): void {
+    ElNotification({
+      type: 'info',
       title: title,
-      description: description,
-      icon: 'i-lucide:bell',
-      timeout: 5000,
+      message: description || undefined,
+      duration: DURATION,
     });
   }
-  function warning(title: string, description: string = '') {
-    toast.add({
-      color: 'orange',
+
+  function warning(title: string, description: string = ''): void {
+    ElNotification({
+      type: 'warning',
       title: title,
-      description: description,
-      icon: 'i-lucide:triangle-alert',
-      timeout: 5000,
+      message: description || undefined,
+      duration: DURATION,
     });
   }
-  function error(title: string, description: string = '') {
-    toast.add({
-      color: 'rose',
+
+  function error(title: string, description: string = ''): void {
+    ElNotification({
+      type: 'error',
       title: title,
-      description: description,
-      icon: 'i-lucide:skull',
-      timeout: 5000,
+      message: description || undefined,
+      duration: DURATION,
     });
   }
 

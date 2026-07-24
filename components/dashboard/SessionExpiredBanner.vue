@@ -17,7 +17,7 @@ import { useIntervalFn } from '@vueuse/core';
 import type { AlertAction } from '#ui/types';
 import LoginModal from '~/components/modal/Login.vue';
 
-const modal = useModal();
+const modal = useDialog();
 
 // session 过期时间戳（秒），空字符串/无值表示未过期
 const expiredAt = ref<string>('');

@@ -5,7 +5,7 @@ import QQGroupModal from '~/components/modal/QQGroup.vue';
 import { docsWebSite } from '~/config';
 import { gotoLink } from '~/utils';
 
-const modal = useModal();
+const modal = useDialog();
 
 // CredentialDialog 相关变量
 const credentialsDialogOpen = ref(false);

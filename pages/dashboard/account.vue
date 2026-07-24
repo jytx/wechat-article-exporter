@@ -35,7 +35,7 @@
 	});
 
 	const toast = toastFactory();
-	const modal = useModal();
+	const modal = useDialog();
 	const { checkLogin } = useLoginCheck();
 
 	// 新增：使用公众号 API

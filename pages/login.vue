@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoginModal from '~/components/modal/Login.vue';
 
-const modal = useModal();
+const modal = useDialog();
 
 onMounted(() => {
   // 清除旧的 auth-key cookie，避免使用过期 token

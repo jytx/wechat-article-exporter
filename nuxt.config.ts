@@ -4,7 +4,7 @@ export default defineNuxtConfig({
   devtools: {
     enabled: false,
   },
-  modules: ['@vueuse/nuxt', '@nuxt/ui', 'nuxt-monaco-editor', '@sentry/nuxt/module', 'nuxt-umami'],
+  modules: ['@vueuse/nuxt', '@nuxt/icon', '@element-plus/nuxt', '@nuxtjs/tailwindcss', 'nuxt-monaco-editor', '@sentry/nuxt/module', 'nuxt-umami'],
   ssr: false,
   runtimeConfig: {
     public: {

@@ -1,7 +1,4 @@
-import LoginModal from '~/components/modal/Login.vue';
-
 export default () => {
-  const modal = useModal();
   const router = useRouter();
 
   // 检查应用登录状态

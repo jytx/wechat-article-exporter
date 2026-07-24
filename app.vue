@@ -4,8 +4,7 @@
       <NuxtPage />
     </NuxtLayout>
 
-    <UNotifications />
-    <UModals />
+    <AppDialogHost />
   </div>
 </template>
 

@@ -54,7 +54,7 @@ import SearchAccountForm from '~/components/global/SearchAccountForm.vue';
 import type { AccountInfo } from '~/types/types';
 
 const toast = useToast();
-const modal = useModal();
+const modal = useDialog();
 
 const isOpen = ref(false);
 const searchFormRef = ref<InstanceType<typeof SearchAccountForm> | null>(null);

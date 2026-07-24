@@ -7,7 +7,7 @@ import { IMAGE_PROXY } from '~/config';
 import type { LogoutResponse } from '~/types/types';
 
 const loginAccount = useLoginAccount();
-const modal = useModal();
+const modal = useDialog();
 
 const now = ref(new Date());
 const distance = computed(() => {

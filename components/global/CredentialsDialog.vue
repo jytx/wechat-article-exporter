@@ -187,7 +187,7 @@ for (const item of credentials.value) {
 const validCredentialCount = computed(() => credentials.value.filter(c => c.valid).length);
 const pendingCredentialCount = computed(() => credentials.value.filter(c => c.valid && !c.added).length);
 const toast = toastFactory();
-const modal = useModal();
+const modal = useDialog();
 
 const addingBiz = ref<string | null>(null);
 

@@ -2,7 +2,7 @@
 import { request } from '#shared/utils/request';
 import type { LoginAccount, ScanLoginResult, StartLoginResult } from '~/types/types';
 
-const modal = useModal();
+const modal = useDialog();
 
 const qrcodeSrc = ref('');
 const loading = ref(false);
@@ -129,26 +129,25 @@ async function bizLogin() {
 </script>
 
 <template>
-  <UModal prevent-close>
-    <UCard>
-      <template #header>
-        <h2 class="text-lg font-semibold">登录微信公众号</h2>
-        <UButton
-          square
-          variant="link"
-          color="gray"
-          icon="i-lucide:x"
-          class="absolute right-3 top-3"
-          @click="closeModal"
-        />
-      </template>
+  <div>
+    <!-- 头部 -->
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <h2 class="text-lg font-semibold">登录微信公众号</h2>
+      <UButton
+        square
+        variant="link"
+        color="gray"
+        icon="i-lucide:x"
+        class="absolute right-3 top-3"
+        @click="closeModal"
+      />
+    </div>
 
-      <!-- 二维码图片展示区 -->
-      <div class="flex flex-col justify-center items-center mx-auto size-80">
-        <UIcon v-if="loading" name="i-lucide:loader" :size="28" class="animate-spin text-slate-500" />
-        <p v-if="msg" class="text-rose-500">{{ msg }}</p>
-        <img v-if="qrcodeSrc" :src="qrcodeSrc" alt="" class="w-full rounded-md" />
-      </div>
-    </UCard>
-  </UModal>
+    <!-- 二维码图片展示区 -->
+    <div class="flex flex-col justify-center items-center mx-auto size-80 p-5">
+      <UIcon v-if="loading" name="i-lucide:loader" :size="28" class="animate-spin text-slate-500" />
+      <p v-if="msg" class="text-rose-500">{{ msg }}</p>
+      <img v-if="qrcodeSrc" :src="qrcodeSrc" alt="" class="w-full rounded-md" />
+    </div>
+  </div>
 </template>
