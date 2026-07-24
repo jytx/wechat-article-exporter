@@ -52,6 +52,7 @@ import LoginModal from '~/components/modal/Login.vue';
 import { ACCOUNT_LIST_PAGE_SIZE, ACCOUNT_TYPE } from '~/config';
 import SearchAccountForm from '~/components/global/SearchAccountForm.vue';
 import type { AccountInfo } from '~/types/types';
+import toastFactory from '~/composables/toast';
 
 const toast = toastFactory();
 const modal = useDialog();

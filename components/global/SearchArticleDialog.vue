@@ -109,6 +109,7 @@
 <script setup lang="ts">
 import { Loader } from 'lucide-vue-next';
 import SearchArticleForm from '~/components/global/SearchArticleForm.vue';
+import toastFactory from '~/composables/toast';
 
 const toast = toastFactory();
 
