@@ -96,9 +96,8 @@ h1, h2, h3 {
 
 /* ── Element Plus 组件微调 ── */
 
-/* 按钮：圆角加大 */
+/* 按钮：字体加粗 + 悬停微浮（圆角由 --el-border-radius-base 控制，不强制覆盖以免破坏 split button 的 rounded-r-none 等 class）*/
 .el-button {
-  border-radius: var(--el-border-radius-base);
   font-weight: 500;
   transition: transform 0.15s var(--ease-out-quart, cubic-bezier(0.25,1,0.5,1)), box-shadow 0.15s ease;
 }
@@ -130,6 +129,9 @@ h1, h2, h3 {
 }
 .el-drawer {
   --el-drawer-padding-primary: 20px;
+}
+.el-drawer__header {
+  margin-bottom: 0 !important;
 }
 
 /* 输入框：圆角、聚焦蓝 */

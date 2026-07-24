@@ -108,69 +108,88 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- 收起状态：只显示头像 + 退出图标 -->
-  <footer v-if="collapsed" class="flex flex-col items-center gap-2 pt-3 border-t border-black/[0.07]">
-    <template v-if="loginAccount">
-      <ElTooltip :content="loginAccount.nickname || ''" placement="right">
-        <img
-          v-if="loginAccount.avatar"
-          :src="IMAGE_PROXY + loginAccount.avatar"
-          alt=""
-          class="rounded-full size-9 ring-1 ring-gray-300 cursor-pointer"
-          @click="emit('expand')"
-        />
-      </ElTooltip>
-      <ElTooltip content="退出登录" placement="right">
-        <button
-          :disabled="logoutBtnLoading"
-          class="flex items-center justify-center size-8 rounded-md text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
-          @click="logout"
-        >
-          <UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" class="size-[18px]" />
-        </button>
-      </ElTooltip>
-    </template>
-    <button v-else class="flex items-center justify-center size-9 rounded-md bg-black/5 hover:bg-black/10 transition-colors" @click="login">
-      <UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" class="size-[18px] text-gray-500" />
-    </button>
-  </footer>
-
-  <!-- 展开状态：完整信息 -->
-  <footer v-else class="flex flex-col space-y-2 pt-3 border-t dark:border-slate-600">
-    <div v-if="loginAccount" class="space-y-3">
-      <div class="flex items-center space-x-2">
-        <img
-          v-if="loginAccount.avatar"
-          :src="IMAGE_PROXY + loginAccount.avatar"
-          alt=""
-          class="rounded-full size-10 ring-1 ring-gray-300"
-        />
-        <ElTooltip
-          v-if="loginAccount.nickname"
-          class="flex-1 overflow-hidden"
-          placement="top-start"
-        >
-          <template #content>
-            <span>{{ loginAccount.nickname }}</span>
-          </template>
-          <span class="whitespace-nowrap text-ellipsis overflow-hidden">{{ loginAccount.nickname }}</span>
+  <!-- 统一 footer，展开/收起内容用 opacity + max-height 平滑过渡 -->
+  <footer class="flex flex-col pt-3 border-t border-black/[0.07]">
+    <!-- 头像区域：收起时纵向排列（头像在上，退出在下），展开时横向排列 -->
+    <div
+      class="flex items-center transition-all duration-300"
+      :class="collapsed ? 'flex-col gap-2' : 'justify-center'"
+    >
+      <!-- 已登录 -->
+      <template v-if="loginAccount">
+        <!-- 头像（收起时可点击展开） -->
+        <ElTooltip v-if="collapsed" :content="loginAccount.nickname || ''" placement="right">
+          <img
+            v-if="loginAccount.avatar"
+            :src="IMAGE_PROXY + loginAccount.avatar"
+            alt=""
+            class="rounded-full size-9 ring-1 ring-gray-300 cursor-pointer"
+            @click="emit('expand')"
+          />
         </ElTooltip>
-
-        <ElButton
-          :loading="logoutBtnLoading"
-          class="bg-slate-10 hover:bg-rose-500 disabled:bg-rose-500"
-          @click="logout"
+        <img
+          v-else-if="loginAccount.avatar"
+          :src="IMAGE_PROXY + loginAccount.avatar"
+          alt=""
+          class="rounded-full size-10 ring-1 ring-gray-300 flex-shrink-0"
+        />
+        <!-- 展开态文字（v-show 始终在 DOM，用 opacity 过渡避免弹出） -->
+        <div
+          class="overflow-hidden flex items-center transition-all duration-300 ease-out"
+          :style="collapsed ? { opacity: 0, maxWidth: '0', margin: '0' } : { opacity: 1, maxWidth: '200px', flex: '1 1 auto' }"
+        >
+          <ElTooltip v-if="loginAccount.nickname" placement="top-start">
+            <template #content>
+              <span>{{ loginAccount.nickname }}</span>
+            </template>
+            <span class="whitespace-nowrap text-ellipsis overflow-hidden block ml-2">{{ loginAccount.nickname }}</span>
+          </ElTooltip>
+          <ElButton
+            :loading="logoutBtnLoading"
+            class="bg-slate-10 hover:bg-rose-500 disabled:bg-rose-500 flex-shrink-0"
+            @click="logout"
           ><template #icon><UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" /></template>退出
-        </ElButton>
-      </div>
-      <div class="text-sm">
+          </ElButton>
+        </div>
+        <!-- 收起态退出按钮 -->
+        <ElTooltip v-if="collapsed" content="退出登录" placement="right">
+          <button
+            :disabled="logoutBtnLoading"
+            class="flex items-center justify-center size-8 rounded-md text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+            @click="logout"
+          >
+            <UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" class="size-[18px]" />
+          </button>
+        </ElTooltip>
+      </template>
+      <!-- 未登录 -->
+      <template v-else>
+        <div
+          class="overflow-hidden transition-all duration-300 ease-out"
+          :style="collapsed ? { opacity: 0, maxWidth: '0' } : { opacity: 1, maxWidth: '200px' }"
+        >
+          <ElButton @click="login">登录公众号</ElButton>
+        </div>
+        <button
+          v-if="collapsed"
+          class="flex items-center justify-center size-9 rounded-md bg-black/5 hover:bg-black/10 transition-colors"
+          @click="login"
+        >
+          <UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" class="size-[18px] text-gray-500" />
+        </button>
+      </template>
+    </div>
+
+    <!-- 展开态：过期时间 + 存储用量（v-show + opacity 过渡） -->
+    <div
+      class="overflow-hidden transition-all duration-300 ease-out"
+      :style="collapsed ? { opacity: 0, maxHeight: '0' } : { opacity: 1, maxHeight: '120px' }"
+    >
+      <div v-if="loginAccount" class="mt-3 text-sm">
         <span>登录信息过期时间还剩: </span>
         <span class="font-mono" :class="warning ? 'text-rose-500' : 'text-green-500'">{{ distance }}</span>
       </div>
+      <StorageUsage />
     </div>
-    <div v-else>
-      <ElButton @click="login">登录公众号</ElButton>
-    </div>
-    <StorageUsage />
   </footer>
 </template>

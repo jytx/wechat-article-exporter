@@ -191,11 +191,11 @@ onMounted(async () => {
       </ElInput>
 
       <!-- 时间范围 -->
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-gray-500">时间</span>
+      <div class="flex items-center gap-2 flex-nowrap">
+        <span class="text-sm text-gray-500 whitespace-nowrap">时间</span>
         <ElSelect
           v-model="selectedDays"
-          class="w-28"
+          style="width: 112px; flex-shrink: 0"
         >
           <ElOption
             v-for="item in dayOptions"
@@ -207,14 +207,14 @@ onMounted(async () => {
       </div>
 
       <!-- 公众号筛选 -->
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-gray-500">公众号</span>
+      <div class="flex items-center gap-2 flex-nowrap">
+        <span class="text-sm text-gray-500 whitespace-nowrap">公众号</span>
         <ElSelect
           v-model="selectedFakeids"
           multiple
           filterable
           placeholder="全部"
-          class="w-48"
+          style="width: 192px; flex-shrink: 0"
         >
           <ElOption
             v-for="account in allAccounts"

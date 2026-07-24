@@ -623,75 +623,47 @@ function copyWechatLink() {
             停止
           </ElButton>
 
-          <!-- 抓取按钮组 -->
-          <div class="flex items-center gap-0">
-            <!-- 主抓取按钮 -->
-            <ElButton
-              :loading="downloadBtnLoading"
-              :disabled="!selectedAccount"
-              class="font-mono rounded-r-none"
-              @click="executeDownload"
-            >{{ downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : `抓取 (${downloadTypes.find(t => t.value === selectedDownloadType)?.label})` }}</ElButton
-            >
-            <!-- 下拉选择按钮 -->
-            <ElPopover>
-              <template #reference>
-                <ElButton
-                  :disabled="!selectedAccount || downloadBtnLoading"
-                  class="font-mono rounded-l-none border-l-0"
-                  ><template #icon><UIcon name="i-heroicons-chevron-down-20-solid" /></template></ElButton
-                >
-              </template>
-              <div class="p-1">
-                <button
+          <!-- 抓取按钮组（split-button：主按钮执行抓取，箭头切换类型） -->
+          <ElDropdown
+            split-button
+            type="primary"
+            :loading="downloadBtnLoading"
+            :disabled="!selectedAccount || downloadBtnLoading"
+            class="font-mono"
+            @click="executeDownload"
+          >
+            {{ downloadBtnLoading ? `抓取中 ${downloadCompletedCount}/${downloadTotalCount}` : `抓取 (${downloadTypes.find(t => t.value === selectedDownloadType)?.label})` }}
+            <template #dropdown>
+              <ElDropdownMenu>
+                <ElDropdownItem
                   v-for="type in downloadTypes"
                   :key="type.value"
                   @click="selectedDownloadType = type.value"
-                  class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  :class="{
-                    'bg-gray-100 dark:bg-gray-800': selectedDownloadType === type.value
-                  }"
-                >
-                  {{ type.label }}
-                </button>
-              </div>
-            </ElPopover>
-          </div>
+                >{{ type.label }}</ElDropdownItem>
+              </ElDropdownMenu>
+            </template>
+          </ElDropdown>
 
-          <!-- 导出按钮组 -->
-          <div class="flex items-center gap-0">
-            <!-- 主导出按钮 -->
-            <ElButton
-              :loading="exportBtnLoading"
-              :disabled="!selectedAccount"
-              class="font-mono rounded-r-none"
-              @click="executeExport"
-            >{{ exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : `导出 (${exportFormats.find(f => f.value === selectedExportFormat)?.label})` }}</ElButton
-            >
-            <!-- 下拉选择按钮 -->
-            <ElPopover>
-              <template #reference>
-                <ElButton
-                  :disabled="!selectedAccount || exportBtnLoading"
-                  class="font-mono rounded-l-none border-l-0"
-                  ><template #icon><UIcon name="i-heroicons-chevron-down-20-solid" /></template></ElButton
-                >
-              </template>
-              <div class="p-1">
-                <button
+          <!-- 导出按钮组（split-button：主按钮执行导出，箭头切换格式） -->
+          <ElDropdown
+            split-button
+            type="primary"
+            :loading="exportBtnLoading"
+            :disabled="!selectedAccount || exportBtnLoading"
+            class="font-mono"
+            @click="executeExport"
+          >
+            {{ exportBtnLoading ? `${exportPhase} ${exportCompletedCount}/${exportTotalCount}` : `导出 (${exportFormats.find(f => f.value === selectedExportFormat)?.label})` }}
+            <template #dropdown>
+              <ElDropdownMenu>
+                <ElDropdownItem
                   v-for="format in exportFormats"
                   :key="format.value"
                   @click="selectedExportFormat = format.value"
-                  class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  :class="{
-                    'bg-gray-100 dark:bg-gray-800': selectedExportFormat === format.value
-                  }"
-                >
-                  {{ format.label }}
-                </button>
-              </div>
-            </ElPopover>
-          </div>
+                >{{ format.label }}</ElDropdownItem>
+              </ElDropdownMenu>
+            </template>
+          </ElDropdown>
 
           <ElButton
             :disabled="!selectedAccount"

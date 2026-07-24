@@ -6,7 +6,7 @@
     </template>
     <div
       ref="scrollContainerRef"
-      class="flex flex-col h-full overflow-y-scroll"
+      class="flex flex-col h-full overflow-y-auto no-scrollbar"
       @scroll="onScroll"
     >
       <div class="sticky top-0 bg-white py-4 px-2 shadow dark:bg-gray-900 z-10">

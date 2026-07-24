@@ -1,22 +1,25 @@
 <template>
   <ElSelect
-    v-model="selected"
+    v-model="selectedFakeid"
     size="default"
     filterable
     placeholder="请选择公众号"
     :loading="loading"
     class="w-full"
+    @change="onChange"
   >
     <ElOption
       v-for="account in sortedAccountInfos"
       :key="account.fakeid"
       :label="account.nickname"
-      :value="account"
+      :value="account.fakeid"
     >
-      <ElAvatar :src="IMAGE_PROXY + account.round_head_img" size="small" />
-      <div>
-        <p class="text-[16px]">{{ account.nickname }}</p>
-        <p class="text-gray-500 text-sm">合集数: {{ account.albums?.length || 0 }}</p>
+      <div class="flex items-center gap-2">
+        <ElAvatar v-if="account.round_head_img" :src="IMAGE_PROXY + account.round_head_img" size="small" />
+        <div class="flex flex-col">
+          <span class="text-[15px] text-gray-900">{{ account.nickname }}</span>
+          <span class="text-xs text-gray-400">合集数: {{ account.albums?.length || 0 }}</span>
+        </div>
       </div>
     </ElOption>
   </ElSelect>
@@ -94,4 +97,18 @@
 	});
 
 	const selected = defineModel<AccountInfo | undefined>();
+
+	// 内部用 fakeid 标量做选中值（避免 ElSelect 对象引用比较失败）
+	const selectedFakeid = ref<string>('');
+
+	// selected 变化时同步到 selectedFakeid（父→子）
+	watch(selected, (val) => {
+		selectedFakeid.value = val?.fakeid ?? '';
+	}, { immediate: true });
+
+	// 选择变化时找到完整对象同步给父组件（子→父）
+	function onChange(fakeid: string): void {
+		const account = sortedAccountInfos.value.find(a => a.fakeid === fakeid);
+		selected.value = account;
+	}
 </script>

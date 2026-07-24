@@ -68,7 +68,7 @@ function submit() {
         <h1 class="font-semibold text-2xl">在线接口调试工具</h1>
       </template>
 
-      <div class="overflow-y-scroll h-[calc(100vh-72px)] space-y-5">
+      <div class="overflow-y-auto h-[calc(100vh-72px)] space-y-5 no-scrollbar">
           <div class="flex items-center gap-3">
             <span>选择接口: </span>
             <ElSelect
