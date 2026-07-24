@@ -7,6 +7,10 @@ interface NavItem {
   tags?: string[];
 }
 
+defineProps<{
+  collapsed?: boolean;
+}>();
+
 const items = ref<NavItem[]>([
   { name: '公众号管理', icon: 'i-lucide:users', href: '/dashboard/account' },
   { name: '文章下载', icon: 'i-lucide:file-down', href: '/dashboard/article' },
@@ -25,7 +29,14 @@ const items = ref<NavItem[]>([
   <nav class="flex-1 mt-6">
     <ul class="flex flex-col gap-1">
       <li v-for="item in items" :key="item.name">
-        <NuxtLink :to="item.href" class="flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm nav-link transition-colors duration-150">
+        <!-- 收起状态：只显示图标，hover 时 tooltip 显示名称 -->
+        <ElTooltip v-if="collapsed" :content="item.name" placement="right">
+          <NuxtLink :to="item.href" class="flex h-9 items-center justify-center rounded-lg nav-link transition-colors duration-150">
+            <UIcon :name="item.icon" class="size-[18px] opacity-70" />
+          </NuxtLink>
+        </ElTooltip>
+        <!-- 展开状态：图标 + 文字 -->
+        <NuxtLink v-else :to="item.href" class="flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm nav-link transition-colors duration-150">
           <UIcon :name="item.icon" class="size-[18px] opacity-70" />
           <p>{{ item.name }}</p>
           <ElTag v-if="item.tags" v-for="tag in item.tags" type="primary" effect="light">{{ tag }}</ElTag>

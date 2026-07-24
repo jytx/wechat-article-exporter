@@ -6,6 +6,14 @@ import StorageUsage from '~/components/StorageUsage.vue';
 import { IMAGE_PROXY } from '~/config';
 import type { LogoutResponse } from '~/types/types';
 
+defineProps<{
+  collapsed?: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: 'expand'): void;
+}>();
+
 const loginAccount = useLoginAccount();
 const modal = useDialog();
 
@@ -100,7 +108,35 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <footer class="flex flex-col space-y-2 pt-3 border-t dark:border-slate-600">
+  <!-- 收起状态：只显示头像 + 退出图标 -->
+  <footer v-if="collapsed" class="flex flex-col items-center gap-2 pt-3 border-t border-black/[0.07]">
+    <template v-if="loginAccount">
+      <ElTooltip :content="loginAccount.nickname || ''" placement="right">
+        <img
+          v-if="loginAccount.avatar"
+          :src="IMAGE_PROXY + loginAccount.avatar"
+          alt=""
+          class="rounded-full size-9 ring-1 ring-gray-300 cursor-pointer"
+          @click="emit('expand')"
+        />
+      </ElTooltip>
+      <ElTooltip content="退出登录" placement="right">
+        <button
+          :disabled="logoutBtnLoading"
+          class="flex items-center justify-center size-8 rounded-md text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+          @click="logout"
+        >
+          <UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" class="size-[18px]" />
+        </button>
+      </ElTooltip>
+    </template>
+    <button v-else class="flex items-center justify-center size-9 rounded-md bg-black/5 hover:bg-black/10 transition-colors" @click="login">
+      <UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" class="size-[18px] text-gray-500" />
+    </button>
+  </footer>
+
+  <!-- 展开状态：完整信息 -->
+  <footer v-else class="flex flex-col space-y-2 pt-3 border-t dark:border-slate-600">
     <div v-if="loginAccount" class="space-y-3">
       <div class="flex items-center space-x-2">
         <img
