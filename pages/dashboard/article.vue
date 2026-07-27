@@ -752,16 +752,15 @@ function copyWechatLink() {
         </div>
       </div>
 
-      <!-- 数据表格 -->
-      <div v-else class="flex-1 flex flex-col overflow-hidden">
+      <!-- 数据表格 + 分页（整体放在 flex-1 容器中，避免切换时页码栏跳动） -->
+      <div v-else class="flex-1 min-h-0 flex flex-col overflow-hidden">
         <ElTable
           ref="tableRef"
           v-loading="tableLoading"
           :data="globalRowData"
           stripe
           border
-          height="100%"
-          style="width: 100%"
+          style="width: 100%; flex: 1; min-height: 0"
           :row-key="getRowKey"
           @selection-change="onSelectionChange"
           @filter-change="onFilterChange"
@@ -952,7 +951,7 @@ function copyWechatLink() {
           </ElTableColumn>
 
           <!-- 25. 操作 -->
-          <ElTableColumn label="操作" width="140" fixed="right">
+          <ElTableColumn label="操作" width="180" fixed="right">
             <template #default="{ row }">
               <GridArticleActions :data="row" :on-preview="preview" :on-goto-link="onGotoLink" :on-add-account="addAccountToManage" :is-account-managed="isAccountManaged" />
             </template>
@@ -960,54 +959,54 @@ function copyWechatLink() {
         </ElTable>
 
         <!-- 状态栏：已选 X/Y -->
-        <div class="text-sm text-gray-500 px-3 py-1">
+        <div class="flex-shrink-0 text-sm text-gray-500 px-3 py-1">
           已选 {{ selectedRows.length }} / {{ globalRowData.length }} 条
         </div>
-      </div>
 
-      <!-- 分页 -->
-      <div
-        v-if="pagination.totalPages > 1"
-        class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
-      >
-        <div class="text-sm text-gray-600 dark:text-gray-400">
-          共 {{ pagination.total }} 条记录，第 {{ currentPage }} / {{ pagination.totalPages }} 页
-        </div>
-        <div class="flex items-center gap-2">
-          <ElButton
-            :disabled="currentPage === 1"
-            @click="currentPage > 1 && (currentPage--, setPage(currentPage), refresh())"
-            ><template #icon><UIcon name="i-heroicons-chevron-left" /></template></ElButton
-          >
-          <div class="flex items-center gap-1 flex-nowrap">
-            <ElInput
-              type="number"
-              v-model="inputPage"
-              :min="1"
-              :max="pagination.totalPages"
-              style="width: 64px; flex-shrink: 0"
-              @keyup.enter="handlePageInput"
-              @blur="handlePageInput"
-            />
-            <span class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">/ {{ pagination.totalPages }}</span>
+        <!-- 分页 -->
+        <div
+          v-if="pagination.totalPages > 1"
+          class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+        >
+          <div class="text-sm text-gray-600 dark:text-gray-400">
+            共 {{ pagination.total }} 条记录，第 {{ currentPage }} / {{ pagination.totalPages }} 页
           </div>
-          <ElButton
-            :disabled="currentPage === pagination.totalPages"
-            @click="currentPage < pagination.totalPages && (currentPage++, setPage(currentPage), refresh())"
-            ><template #icon><UIcon name="i-heroicons-chevron-right" /></template></ElButton
-          >
-          <ElButton
-            size="small"
-            text
-            @click="
-              currentPage = 1;
-              setPage(1);
-              refresh();
-            "
-          >
-            <template #icon><UIcon name="i-heroicons-arrow-uturn-right" /></template>
-            <span class="sr-only">刷新</span>
-          </ElButton>
+          <div class="flex items-center gap-2">
+            <ElButton
+              :disabled="currentPage === 1"
+              @click="currentPage > 1 && (currentPage--, setPage(currentPage), refresh())"
+              ><template #icon><UIcon name="i-heroicons-chevron-left" /></template></ElButton
+            >
+            <div class="flex items-center gap-1 flex-nowrap">
+              <ElInput
+                type="number"
+                v-model="inputPage"
+                :min="1"
+                :max="pagination.totalPages"
+                style="width: 64px; flex-shrink: 0"
+                @keyup.enter="handlePageInput"
+                @blur="handlePageInput"
+              />
+              <span class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">/ {{ pagination.totalPages }}</span>
+            </div>
+            <ElButton
+              :disabled="currentPage === pagination.totalPages"
+              @click="currentPage < pagination.totalPages && (currentPage++, setPage(currentPage), refresh())"
+              ><template #icon><UIcon name="i-heroicons-chevron-right" /></template></ElButton
+            >
+            <ElButton
+              size="small"
+              text
+              @click="
+                currentPage = 1;
+                setPage(1);
+                refresh();
+              "
+            >
+              <template #icon><UIcon name="i-heroicons-arrow-uturn-right" /></template>
+              <span class="sr-only">刷新</span>
+            </ElButton>
+          </div>
         </div>
       </div>
     </div>
