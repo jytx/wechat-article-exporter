@@ -167,6 +167,10 @@ async function addAccountToManage(row: any) {
     });
     managedFakeids.value.add(row.fakeid);
     toast.success('已添加', '公众号已加入管理列表');
+    // 若当前处于「未管理」视图，加入管理后该文章不再属于未管理，刷新列表使其消失
+    if (selectedAccount.value?.fakeid === '__unmanaged__') {
+      refresh();
+    }
   } catch (e: any) {
     toast.error('添加失败', e?.data?.message || e?.message || '添加失败');
   }
@@ -634,6 +638,23 @@ function copyWechatLink() {
     copied.value = false;
   }, 1000);
 }
+
+/**
+ * 复制文章链接到剪贴板。
+ * 用行 key 区分复制反馈状态，避免多行/与「复制公众号链接」按钮的反馈互相干扰。
+ */
+const copiedLinkKey = ref<string>('');
+function copyArticleLink(row: Article): void {
+  if (!row.link) return;
+  navigator.clipboard.writeText(row.link);
+  copiedLinkKey.value = getRowKey(row);
+  setTimeout(() => {
+    // 仅当仍是当前行时清空，防止快速点击多行导致前一行反馈提前消失
+    if (copiedLinkKey.value === getRowKey(row)) {
+      copiedLinkKey.value = '';
+    }
+  }, 1500);
+}
 </script>
 
 <template>
@@ -781,10 +802,30 @@ function copyWechatLink() {
             </template>
           </ElTableColumn>
 
-          <!-- 3. 链接 -->
+          <!-- 3. 链接（点击复制到剪贴板） -->
           <ElTableColumn prop="link" label="链接" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
-              <span class="font-mono">{{ row.link }}</span>
+              <div class="group/link flex items-center gap-1">
+                <span
+                  class="cursor-pointer truncate font-mono text-sky-600 hover:text-sky-700 hover:underline dark:text-sky-400"
+                  :title="`点击复制：${row.link}`"
+                  @click="copyArticleLink(row)"
+                >{{ row.link }}</span>
+                <UIcon
+                  v-if="copiedLinkKey === getRowKey(row)"
+                  name="i-lucide:check"
+                  class="flex-shrink-0 text-green-500"
+                />
+                <button
+                  v-else
+                  type="button"
+                  class="flex-shrink-0 text-gray-400 opacity-0 transition-opacity hover:text-sky-600 group-hover/link:opacity-100"
+                  title="复制链接"
+                  @click="copyArticleLink(row)"
+                >
+                  <UIcon name="i-lucide:copy" />
+                </button>
+              </div>
             </template>
           </ElTableColumn>
 

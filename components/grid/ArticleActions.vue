@@ -73,12 +73,12 @@ function addAccount() {
         ><template #icon><UIcon name="i-lucide:external-link" /></template></ElButton
       >
     </ElTooltip>
-    <ElTooltip content="预览" placement="top">
+    <ElTooltip :content="contentDownload ? '预览' : '预览（实时抓取）'" placement="top">
       <ElButton
         type="primary"
         circle
         text
-        :disabled="!contentDownload || downloading"
+        :disabled="downloading"
         @click="preview"
         ><template #icon><UIcon name="i-heroicons:fire-16-solid" /></template></ElButton
       >

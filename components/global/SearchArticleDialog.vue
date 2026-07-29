@@ -1,114 +1,90 @@
 <template>
-  <!-- 搜索抽屉 -->
-  <ElDrawer v-model="isOpen" direction="ltr" size="400px">
+  <!--
+    搜索抽屉：左右分栏二级选择布局。
+    - 左栏：搜索框 + 文章列表（可滚动），点击列表项可选中并入库。
+    - 右栏：文章预览正文，点击列表项的「预览」按钮即时展示。
+    整体宽度 960px，在抽屉内通过 flex 实现稳定的左右分栏。
+  -->
+  <ElDrawer v-model="isOpen" direction="ltr" size="960px" class="search-article-drawer">
     <template #header>
       <h3 class="text-lg font-semibold">搜索文章</h3>
     </template>
-    <div
-      ref="scrollContainerRef"
-      class="flex flex-col h-full overflow-y-auto no-scrollbar"
-      @scroll="onScroll"
-    >
-      <div class="sticky top-0 bg-white py-4 px-2 shadow dark:bg-gray-900 z-10">
-        <SearchArticleForm ref="searchFormRef" v-model="articleQuery" @search="searchArticle" />
-        <p v-if="!loading && articleList.length > 0" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          找到 {{ totalArticles }} 篇相关文章
-        </p>
-      </div>
 
-      <!-- 文章列表 -->
-      <div class="flex-1">
-        <ul class="divide-y antialiased">
-          <li
-            v-for="article in articleList"
-            :key="article.aid"
-            class="flex flex-col gap-2 px-2 py-4 hover:bg-slate-50 hover:cursor-pointer group"
-            @click="selectArticle(article)"
-          >
-            <div class="flex justify-between items-start">
-              <p class="font-medium line-clamp-2 flex-1" v-text="article.title"></p>
-              <p v-if="article.create_time_formatted" class="text-sky-500 text-xs ml-2 whitespace-nowrap" v-text="article.create_time_formatted"></p>
-            </div>
-            <div class="flex items-center justify-between">
-              <p class="text-gray-500 text-xs">
-                {{ article.account_nickname || '未知公众号' }}
-              </p>
-              <!-- 预览按钮：点击预览（不选中），阻止冒泡避免触发 selectArticle -->
-              <ElButton
-                size="small"
-                text
-                class="opacity-0 group-hover:opacity-100"
-                title="预览文章内容"
-                @click.stop="previewArticle(article)"
-                ><template #icon><UIcon name="i-lucide:eye" /></template></ElButton
-              >
-            </div>
-            <p v-if="article.digest" class="text-gray-400 text-xs line-clamp-2">{{ article.digest }}</p>
-          </li>
-        </ul>
+    <div class="flex h-full">
+      <!-- ===== 左栏：搜索 + 列表 ===== -->
+      <section class="flex w-[360px] flex-shrink-0 flex-col">
+        <!-- 搜索区（吸顶） -->
+        <div class="z-10 flex-shrink-0 bg-white px-2 py-3 shadow-sm dark:bg-gray-900">
+          <SearchArticleForm ref="searchFormRef" v-model="articleQuery" @search="searchArticle" />
+          <p v-if="!loading && articleList.length > 0" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            找到 {{ totalArticles }} 篇相关文章
+          </p>
+        </div>
 
-        <p v-if="loading" class="flex justify-center items-center my-2 py-2">
-          <Loader :size="28" class="animate-spin text-slate-500" />
-        </p>
-        <p v-else-if="!loading && articleList.length === 0 && hasSearched" class="text-center mt-2 py-2 text-slate-400">
-          未找到相关文章，请尝试其他关键词
-        </p>
-        <p v-else-if="noMoreData && articleList.length > 0" class="text-center mt-2 py-2 text-slate-400">
-          已全部加载完毕
-        </p>
-      </div>
+        <!-- 列表区（仅列表滚动，不影响右栏） -->
+        <div
+          ref="scrollContainerRef"
+          class="no-scrollbar flex-1 overflow-y-auto"
+          @scroll="onScroll"
+        >
+          <ul class="divide-y antialiased">
+            <li
+              v-for="article in articleList"
+              :key="article.aid"
+              class="group flex cursor-pointer flex-col gap-2 px-2 py-4 hover:bg-slate-50"
+              :class="isPreviewing(article) ? 'bg-blue-50 hover:bg-blue-50' : ''"
+              @click="selectArticle(article)"
+            >
+              <div class="flex items-start justify-between">
+                <p class="line-clamp-2 flex-1 font-medium" v-text="article.title"></p>
+                <p v-if="article.create_time_formatted" class="ml-2 whitespace-nowrap text-xs text-sky-500" v-text="article.create_time_formatted"></p>
+              </div>
+              <div class="flex items-center justify-between">
+                <p class="text-xs text-gray-500">
+                  {{ article.account_nickname || '未知公众号' }}
+                </p>
+                <!-- 预览按钮：阻止冒泡，避免触发 selectArticle -->
+                <ElButton
+                  size="small"
+                  text
+                  class="opacity-0 group-hover:opacity-100"
+                  :class="isPreviewing(article) ? '!opacity-100' : ''"
+                  title="预览文章内容"
+                  @click.stop="previewArticle(article)"
+                ><template #icon><UIcon name="i-lucide:eye" /></template></ElButton>
+              </div>
+              <p v-if="article.digest" class="line-clamp-2 text-xs text-gray-400">{{ article.digest }}</p>
+            </li>
+          </ul>
+
+          <p v-if="loading" class="my-2 flex items-center justify-center py-2">
+            <Loader :size="28" class="animate-spin text-slate-500" />
+          </p>
+          <p v-else-if="articleList.length === 0 && hasSearched" class="mt-2 py-2 text-center text-slate-400">
+            未找到相关文章，请尝试其他关键词
+          </p>
+          <p v-else-if="noMoreData && articleList.length > 0" class="mt-2 py-2 text-center text-slate-400">
+            已全部加载完毕
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 右栏：文章预览正文 ===== -->
+      <ArticlePreviewPanel
+        :title="previewTitle"
+        :url="previewUrl"
+        :html="previewHtml"
+        :loading="previewLoading"
+        :error="previewError"
+        @close="closePreview"
+      />
     </div>
   </ElDrawer>
-
-  <!-- 预览面板（固定定位，独立于 USlideover，避免事件连锁导致搜索抽屉一起关闭） -->
-  <Teleport to="body">
-    <div
-      v-if="isPreviewOpen"
-      class="fixed inset-y-0 right-0 z-[60] w-full max-w-[760px] shadow-2xl bg-white dark:bg-gray-900 flex flex-col"
-    >
-      <!-- 头部 -->
-      <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-        <h3 class="text-sm font-medium line-clamp-1 flex-1" :title="previewTitle">
-          <span v-if="previewLoading" class="text-gray-400">加载中...</span>
-          <span v-else>{{ previewTitle }}</span>
-        </h3>
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <ElButton
-            size="small"
-            text
-            @click="window.open(previewUrl, '_blank')"
-            title="在新标签页打开原文"
-            ><template #icon><UIcon name="i-lucide:external-link" /></template></ElButton
-          >
-          <ElButton size="small" text @click="isPreviewOpen = false" title="关闭预览"
-            ><template #icon><UIcon name="i-lucide:x" /></template></ElButton
-          >
-        </div>
-      </div>
-      <!-- 内容区 -->
-      <div class="flex-1 w-full bg-white relative overflow-hidden">
-        <div v-if="previewLoading" class="absolute inset-0 flex items-center justify-center text-gray-400">
-          <Loader :size="28" class="animate-spin" />
-        </div>
-        <div v-else-if="previewError" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 gap-2 p-8 text-center">
-          <p>预览失败</p>
-          <p class="text-xs text-gray-400">{{ previewError }}</p>
-          <ElButton size="small" type="primary" plain class="mt-2" @click="window.open(previewUrl, '_blank')">在新标签页打开原文</ElButton>
-        </div>
-        <iframe
-          v-else-if="previewHtml"
-          :srcdoc="previewHtml"
-          class="w-full h-full border-0"
-          sandbox="allow-same-origin allow-popups"
-          referrerpolicy="no-referrer"
-        ></iframe>
-      </div>
-    </div>
-  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { Loader } from 'lucide-vue-next';
+import ArticlePreviewPanel from '~/components/global/ArticlePreviewPanel.vue';
 import SearchArticleForm from '~/components/global/SearchArticleForm.vue';
 import toastFactory from '~/composables/toast';
 
@@ -229,7 +205,7 @@ async function loadData() {
 const emit = defineEmits(['select:article']);
 
 // 预览状态：实时 fetch 文章正文，用 srcdoc 渲染（绕过微信 CSP frame-ancestors）
-const isPreviewOpen = ref(false);
+// 以 previewUrl 是否为空作为「是否在预览」的判定，无需额外的 isPreviewOpen
 const previewUrl = ref('');
 const previewTitle = ref('');
 const previewHtml = ref('');
@@ -239,6 +215,20 @@ const previewError = ref('');
 function selectArticle(article: any) {
   emit('select:article', article);
   // 不关闭抽屉，允许继续添加其他文章
+}
+
+/** 判断某篇文章是否正处于预览中（用于列表项高亮） */
+function isPreviewing(article: any): boolean {
+  return !!previewUrl.value && previewUrl.value === article.link;
+}
+
+/** 关闭预览：清空预览状态，回到空状态引导 */
+function closePreview() {
+  previewUrl.value = '';
+  previewTitle.value = '';
+  previewHtml.value = '';
+  previewError.value = '';
+  previewLoading.value = false;
 }
 
 /**
@@ -252,22 +242,26 @@ async function previewArticle(article: any) {
   previewLoading.value = true;
   previewError.value = '';
   previewHtml.value = '';
-  isPreviewOpen.value = true;
 
   try {
     const res = await $fetch<{ success: boolean; data: { html: string; error?: string } }>(
       '/api/web/data/v1/topic/preview-html',
       { params: { url: article.link }, credentials: 'include' }
     );
+    // 用户可能在请求期间切换到其他文章，这里校验避免旧请求覆盖新预览
+    if (previewUrl.value !== article.link) return;
     if (res.success && res.data?.html) {
       previewHtml.value = res.data.html;
     } else {
       previewError.value = res.data?.error || '未能获取文章内容';
     }
   } catch (e: any) {
+    if (previewUrl.value !== article.link) return;
     previewError.value = e?.data?.message || e?.message || '预览请求失败';
   } finally {
-    previewLoading.value = false;
+    if (previewUrl.value === article.link) {
+      previewLoading.value = false;
+    }
   }
 }
 
@@ -282,9 +276,21 @@ function open() {
   totalArticles.value = 0;
   noMoreData.value = false;
   hasSearched.value = false;
+  closePreview();
 }
 
 defineExpose({
   open,
 });
 </script>
+
+<style>
+/*
+  抽屉内容区顶部内边距清零，把屏幕空间留给左右分栏内容。
+  ElDrawer 默认渲染到 body，scoped 无法穿透到弹层，故用非 scoped 全局样式，
+  但通过自定义 .search-article-drawer class 限定作用域，避免影响其他抽屉。
+*/
+.search-article-drawer .el-drawer__body {
+  padding-top: 0;
+}
+</style>

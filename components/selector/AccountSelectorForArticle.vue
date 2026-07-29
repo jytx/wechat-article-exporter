@@ -55,7 +55,7 @@
 		loadAccounts();
 	});
 
-	// 按文章数排序，添加"全部"选项
+	// 按文章数排序，添加"全部"和"未管理"特殊选项
 	const sortedAccountInfos = computed(() => {
 		// 确保不会因为 null 导致错误
 		const accounts = accountInfos.value || [];
@@ -67,12 +67,20 @@
 			round_head_img: '',
 		};
 
+		// 特殊选项：仅查公众号未入库的「孤儿」文章（与后端 articles.get 的 __unmanaged__ 约定一致）
+		const unmanagedOption = {
+			fakeid: '__unmanaged__',
+			nickname: '📨 未管理的文章',
+			synced_count: 0,
+			round_head_img: '',
+		};
+
 		const sorted = [...accounts];
 		sorted.sort((a, b) => {
 			return (b.synced_count || 0) - (a.synced_count || 0);
 		});
 
-		return [allOption, ...sorted];
+		return [allOption, unmanagedOption, ...sorted];
 	});
 
 	// 父组件 v-model 绑定的是完整 Account 对象

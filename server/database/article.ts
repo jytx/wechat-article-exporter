@@ -212,6 +212,72 @@ export async function getArticlesByFakeid(
 }
 
 /**
+ * 获取全部文章（不限定公众号，用于「全部」视图）
+ *
+ * 与 getArticlesByFakeid 的区别：不按 fakeid 过滤，直接查 articles 表，
+ * 这样即使文章所属公众号未入库（fakeid 不在 accounts 表）也能查到。
+ * 通过 LEFT JOIN accounts 补充公众号昵称（未入库时为 null）。
+ *
+ * @param options.search          按标题/摘要模糊搜索
+ * @param options.accountManaged  仅返回公众号未入库的文章（acc.fakeid IS NULL）
+ * @param options.limit           分页大小
+ * @param options.offset          分页偏移
+ */
+export async function getAllArticles(
+  options: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    accountManaged?: boolean;
+  } = {}
+): Promise<{ items: Article[]; total: number }> {
+  try {
+    const db = getDatabase();
+    const { limit = 1000, offset = 0, search, accountManaged = false } = options;
+
+    // 注意：这里不过滤 is_deleted，由调用方按 status 决定是否展示已删除文章
+    let whereClause = 'WHERE a.is_deleted = 0';
+    const params: any[] = [];
+
+    // 仅未管理：文章所属公众号不在 accounts 表（LEFT JOIN 后 acc.fakeid 为空）
+    if (accountManaged) {
+      whereClause += ' AND acc.fakeid IS NULL';
+    }
+
+    if (search && search.trim()) {
+      const searchPattern: string = `%${search.trim()}%`;
+      whereClause += ' AND (a.title LIKE ? OR a.digest LIKE ?)';
+      params.push(searchPattern, searchPattern);
+    }
+
+    // 总数（未管理过滤需要联表，所以 count 也带上 LEFT JOIN）
+    const countJoin = accountManaged ? 'LEFT JOIN accounts acc ON a.fakeid = acc.fakeid' : '';
+    const countStmt = db.prepare(`SELECT COUNT(*) as count FROM articles a ${countJoin} ${whereClause}`);
+    const countResult = countStmt.get(...params) as { count: number };
+    const total: number = countResult.count;
+
+    // 分页数据，联表查询公众号信息
+    const dataStmt = db.prepare(`
+      SELECT
+        a.*,
+        acc.nickname as account_nickname,
+        acc.alias as account_alias
+      FROM articles a
+      LEFT JOIN accounts acc ON a.fakeid = acc.fakeid
+      ${whereClause}
+      ORDER BY a.create_time DESC
+      LIMIT ? OFFSET ?
+    `);
+    const items: Article[] = dataStmt.all(...params, limit, offset) as Article[];
+
+    return { items, total };
+  } catch (error) {
+    log.error('getAllArticles failed:', error);
+    return { items: [], total: 0 };
+  }
+}
+
+/**
  * 批量获取文章
  */
 export async function getArticlesByFakeids(fakeids: string[]): Promise<Article[]> {

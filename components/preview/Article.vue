@@ -27,9 +27,23 @@ const toast = toastFactory();
 const isOpen = ref(false);
 const articleHtml = ref('');
 
+// 实时预览加载中的占位 HTML（文章未抓取时，调 preview-html 接口期间的过渡画面）
+const REMOTE_PREVIEW_LOADING_HTML: string = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; color: #888; background: #fafafa; }
+  .box { text-align: center; }
+  .spinner { width: 36px; height: 36px; border: 3px solid #e0e0e0; border-top-color: #409eff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  p { font-size: 14px; margin: 0; }
+</style></head>
+<body><div class="box"><div class="spinner"></div><p>正在实时抓取文章内容...</p></div></body>
+</html>`;
+
 async function open(article: AppMsgEx) {
   const htmlAsset = await getArticleHtmlFromServer(article.link);
   if (htmlAsset) {
+    // 已抓取：走本地增强渲染管线（含阅读量、留言、IP 属地等）
     isOpen.value = true;
     const rawHtml = htmlAsset.content;
     const cgiData = await parseCgiDataNew(rawHtml);
@@ -46,7 +60,33 @@ async function open(article: AppMsgEx) {
       (preferences.value as Preferences).exportConfig.exportHtmlIncludeComments
     );
   } else {
-    toast.warning('文章预览失败', `文章【${article.title}】还未拉取文章内容`);
+    // 未抓取：调 preview-html 接口实时抓取微信原文预览（不依赖本地下载）
+    await previewFromRemote(article);
+  }
+}
+
+/**
+ * 实时预览：调 preview-html 接口抓取微信原文，直接渲染。
+ * 与本地增强预览的区别：不含阅读量/留言等元数据，但无需预先抓取即可查看。
+ */
+async function previewFromRemote(article: AppMsgEx): Promise<void> {
+  isOpen.value = true;
+  articleHtml.value = REMOTE_PREVIEW_LOADING_HTML;
+
+  try {
+    const res = await $fetch<{ success: boolean; data: { html: string; error?: string } }>(
+      '/api/web/data/v1/topic/preview-html',
+      { params: { url: article.link }, credentials: 'include' }
+    );
+    if (res.success && res.data?.html) {
+      articleHtml.value = res.data.html;
+    } else {
+      toast.warning('预览失败', res.data?.error || `文章【${article.title}】实时抓取失败`);
+      isOpen.value = false;
+    }
+  } catch (e: any) {
+    toast.warning('预览失败', e?.data?.message || e?.message || `文章【${article.title}】实时抓取失败`);
+    isOpen.value = false;
   }
 }
 

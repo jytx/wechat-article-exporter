@@ -40,3 +40,8 @@ agent-harness
 
 # skill 打包产物（二进制 zip）
 *.skill
+
+# agent 运行时产物与本地技能配置（不入库）
+.agents/skills/apple-design-skill/
+.agents/skills/wechat-daily-digest/scripts/articles_data.json
+.agents/skills/wechat-daily-digest/scripts/digest.html

@@ -3,8 +3,8 @@
  * GET /api/web/data/v1/articles
  */
 
-import { getAccount, getAllAccounts } from '~/server/database/account';
-import { getArticlesByFakeid } from '~/server/database/article';
+import { getAccount } from '~/server/database/account';
+import { getAllArticles, getArticlesByFakeid } from '~/server/database/article';
 import { createApiError, ErrorCodes, getPaginationParams, paginatedResponse } from '~/server/utils/api-response';
 import { log } from '~/server/utils/log';
 
@@ -25,7 +25,21 @@ export default defineEventHandler(async event => {
     let articles: any[] = [];
     let total = 0;
 
-    if (fakeid) {
+    // 特殊值：仅查公众号未入库的「孤儿」文章（从全网搜索添加但公众号未管理）
+    // 前端公众号选择器的「未管理的文章」选项会传此 fakeid
+    const UNMANAGED_FAKEID = '__unmanaged__';
+
+    if (fakeid === UNMANAGED_FAKEID) {
+      const result = await getAllArticles({
+        offset: (page - 1) * pageSize,
+        limit: pageSize,
+        search: search || undefined,
+        accountManaged: true,
+      });
+      articles = result.items;
+      total = result.total;
+      log.info(`[articles.get] 未管理文章查询返回: ${articles.length} 条, 总数: ${total}`);
+    } else if (fakeid) {
       // 检查公众号是否存在
       const account = await getAccount(fakeid);
 
@@ -46,40 +60,17 @@ export default defineEventHandler(async event => {
       articles = result.items;
       total = result.total;
     } else {
-      // 获取所有公众号的文章
-      const allAccounts = await getAllAccounts();
-      const allArticles: any[] = [];
-
-      log.info(`[articles.get] 找到 ${allAccounts.length} 个公众号`);
-
-      for (const account of allAccounts) {
-        try {
-          const accountArticles = await getArticlesByFakeid(account.fakeid, {
-            offset: 0,
-            limit: Number.MAX_SAFE_INTEGER, // 获取该公众号所有文章
-            search: search || undefined,
-          });
-          log.info(
-            `[articles.get] 公众号 ${account.nickname} (${account.fakeid}) 有 ${accountArticles.items.length} 篇文章`
-          );
-          allArticles.push(...accountArticles.items);
-        } catch (error) {
-          log.error(`[articles.get] 获取公众号 ${account.fakeid} 的文章失败:`, error);
-        }
-      }
-
-      log.info(`[articles.get] 总共获取到 ${allArticles.length} 篇文章`);
-
-      // 按创建时间降序排序
-      allArticles.sort((a, b) => (b.create_time || 0) - (a.create_time || 0));
-
-      // 计算总数和当前页数据
-      total = allArticles.length;
-      const startIndex = (page - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      articles = allArticles.slice(startIndex, endIndex);
-
-      log.info(`[articles.get] 分页返回: ${articles.length} 条, 总数: ${total}`);
+      // 「全部」视图：直接查 articles 表（不依赖公众号是否入库），
+      // 这样从全网搜索添加但公众号未入库的文章也能查出来。
+      // 旧实现遍历 accounts 表，会导致公众号未入库的文章查不到。
+      const result = await getAllArticles({
+        offset: (page - 1) * pageSize,
+        limit: pageSize,
+        search: search || undefined,
+      });
+      articles = result.items;
+      total = result.total;
+      log.info(`[articles.get] 全部文章查询返回: ${articles.length} 条, 总数: ${total}`);
     }
 
     // 解析 appmsg_album_infos JSON 字符串为数组
