@@ -115,6 +115,14 @@ function extractErrorMessage(error: unknown): string | null {
 
 <template>
   <div class="signin-page min-h-[100dvh] flex items-center justify-center px-4">
+    <!-- 动态背景层：流动光晕 + 网格点阵（纯 CSS，pointer-events 不挡交互） -->
+    <div class="bg-aurora" aria-hidden="true">
+      <span class="blob blob-1"></span>
+      <span class="blob blob-2"></span>
+      <span class="blob blob-3"></span>
+      <span class="grid-dots"></span>
+    </div>
+
     <!-- 门禁卡片 -->
     <div class="signin-card w-full max-w-[400px]">
       <!-- 标题区 -->
@@ -201,26 +209,105 @@ function extractErrorMessage(error: unknown): string | null {
 </template>
 
 <style scoped>
-/* 门禁页底色：比 dashboard 略深的冷灰，衬托毛玻璃卡片 */
+/* ── 页面容器 ── */
 .signin-page {
-  background:
-    radial-gradient(120% 80% at 50% 0%, rgba(0, 113, 227, 0.06), transparent 60%),
-    var(--bg);
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
 }
 
-/* 毛玻璃卡片：呼应 dashboard 的 glass-nav 质感 */
+/* ── 动态背景层：流动光晕 + 网格点阵 ── */
+.bg-aurora {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 流动光晕（blob）：大尺寸高斯模糊圆，缓慢位移营造极光感 */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.55;
+  will-change: transform;
+}
+/* 苹果蓝主光晕 */
+.blob-1 {
+  width: 520px;
+  height: 520px;
+  top: -120px;
+  left: -80px;
+  background: radial-gradient(circle, rgba(0, 113, 227, 0.85), transparent 70%);
+  animation: drift-1 22s ease-in-out infinite;
+}
+/* 青色辅助光晕 */
+.blob-2 {
+  width: 460px;
+  height: 460px;
+  bottom: -140px;
+  right: -60px;
+  background: radial-gradient(circle, rgba(48, 209, 209, 0.7), transparent 70%);
+  animation: drift-2 26s ease-in-out infinite;
+}
+/* 紫色点缀光晕 */
+.blob-3 {
+  width: 380px;
+  height: 380px;
+  top: 40%;
+  left: 55%;
+  background: radial-gradient(circle, rgba(120, 87, 255, 0.6), transparent 70%);
+  animation: drift-3 30s ease-in-out infinite;
+}
+
+/* 网格点阵：细密圆点，增加科技质感，随背景同向漂浮 */
+.grid-dots {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(0, 113, 227, 0.16) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 30%, transparent 80%);
+  opacity: 0.6;
+}
+
+/* 光晕漂移动画（三个 blob 节奏错开，避免同步） */
+@keyframes drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(80px, 60px) scale(1.12); }
+}
+@keyframes drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-70px, -50px) scale(1.08); }
+}
+@keyframes drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-50px, 70px) scale(1.15); }
+}
+
+/* ── 毛玻璃卡片：呼应 dashboard 的 glass-nav 质感 ── */
 .signin-card {
+  position: relative;
+  z-index: 1;
   background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: var(--sh-panel);
+  box-shadow: 0 20px 60px rgba(0, 113, 227, 0.12), var(--sh-panel);
   border-radius: var(--r-panel);
   padding: 40px 36px;
+  /* 入场动画：淡入 + 上浮 */
+  animation: card-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* 标题前的小 Logo 圆形徽标 */
+/* ── 标题前的 Logo 徽标：呼吸光圈 ── */
 .logo-mark {
+  position: relative;
   width: 52px;
   height: 52px;
   border-radius: 16px;
@@ -230,12 +317,28 @@ function extractErrorMessage(error: unknown): string | null {
   background: linear-gradient(135deg, var(--accent), var(--el-color-primary-light-3));
   color: #fff;
   box-shadow: 0 8px 20px rgba(0, 113, 227, 0.25);
+  animation: logo-pulse 3s ease-in-out infinite;
+}
+@keyframes logo-pulse {
+  0%, 100% { box-shadow: 0 8px 20px rgba(0, 113, 227, 0.25); }
+  50% { box-shadow: 0 8px 28px rgba(0, 113, 227, 0.45); }
 }
 
+/* ── 暗色模式适配 ── */
 @media (prefers-color-scheme: dark) {
   .signin-card {
     background: rgba(30, 30, 32, 0.72);
     border-color: rgba(255, 255, 255, 0.1);
   }
+  .blob { opacity: 0.4; }
+  .grid-dots {
+    background-image: radial-gradient(rgba(120, 170, 255, 0.2) 1px, transparent 1px);
+  }
+}
+
+/* ── 降低动态偏好：关闭所有动画，尊重无障碍 ── */
+@media (prefers-reduced-motion: reduce) {
+  .blob, .logo-mark { animation: none; }
+  .signin-card { animation: none; }
 }
 </style>
