@@ -1,5 +1,6 @@
 <template>
-  <ElDrawer v-model="open" size="500px">
+  <!-- append-to-body：将抽屉传送到 body，避免被顶部毛玻璃导航栏(.glass-nav 的 backdrop-filter 会创建独立层叠上下文)困住，导致抽屉层级低于页面主体内容 -->
+  <ElDrawer v-model="open" size="500px" append-to-body>
     <template #header>
       <div class="flex justify-between items-center">
         <h2 class="font-bold text-2xl">抓取 Credentials</h2>

@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import type { ChipColor } from '#ui/types';
 import CredentialsDialog, { type CredentialState } from '~/components/global/CredentialsDialog.vue';
-import QQGroupModal from '~/components/modal/QQGroup.vue';
 import { docsWebSite } from '~/config';
 import { gotoLink } from '~/utils';
-
-const modal = useDialog();
 
 // CredentialDialog 相关变量
 const credentialsDialogOpen = ref(false);
@@ -42,16 +39,6 @@ const isCredentialActive = computed(() => credentialState.value === 'active');
     <!--        </ElBadge>-->
     <!--      </ElTooltip>-->
     <!--    </li>-->
-
-    <li>
-      <ElTooltip content="加入QQ群">
-        <UIcon
-          @click="modal.open(QQGroupModal)"
-          name="i-tdesign:logo-qq-filled"
-          class="size-7 text-zinc-400 hover:text-blue-500 cursor-pointer transition-colors"
-        />
-      </ElTooltip>
-    </li>
 
     <!-- Credential -->
     <li>
@@ -92,15 +79,5 @@ const isCredentialActive = computed(() => credentialState.value === 'active');
       </ElTooltip>
     </li>
 
-    <!-- GitHub -->
-    <li>
-      <ElTooltip content="GitHub">
-        <UIcon
-          @click="gotoLink('https://github.com/wechat-article/wechat-article-exporter')"
-          name="i-lucide:github"
-          class="size-7 text-zinc-400 hover:text-blue-500 cursor-pointer transition-colors"
-        />
-      </ElTooltip>
-    </li>
   </ul>
 </template>
