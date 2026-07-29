@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { ChipColor } from '#ui/types';
+import AccountPopover from '~/components/dashboard/AccountPopover.vue';
 import CredentialsDialog, { type CredentialState } from '~/components/global/CredentialsDialog.vue';
 import { docsWebSite } from '~/config';
 import { gotoLink } from '~/utils';
+
+// 退出应用门禁，返回登录页
+const { logout: appLogout } = useAppAuth();
 
 // CredentialDialog 相关变量
 const credentialsDialogOpen = ref(false);
@@ -41,17 +45,12 @@ const isCredentialActive = computed(() => credentialState.value === 'active');
     <!--    </li>-->
 
     <!-- Credential -->
-    <li>
-      <CredentialsDialog
-        v-model:open="credentialsDialogOpen"
-        v-model:state="credentialState"
-        @update:pending-count="credentialPendingCount = $event"
-      />
+    <li class="flex items-center">
       <ElTooltip content="抓取 Credentials">
-        <div class="relative">
+        <span class="relative inline-flex">
           <UIcon
             @click="credentialsDialogOpen = true"
-            name="i-lucide:dog"
+            name="i-heroicons:identification"
             :class="[
               'size-7 cursor-pointer transition-colors',
               { 'text-zinc-400 hover:text-blue-500': !isCredentialActive },
@@ -64,20 +63,43 @@ const isCredentialActive = computed(() => credentialState.value === 'active');
           >
             {{ credentialBadgeText }}
           </span>
-        </div>
+        </span>
       </ElTooltip>
     </li>
 
     <!-- 文档 -->
-    <li>
+    <li class="flex items-center">
       <ElTooltip content="文档">
         <UIcon
-          name="i-lucide:book-open"
+          name="i-heroicons:book-open"
           @click="gotoLink(docsWebSite)"
           class="size-7 text-zinc-400 hover:text-blue-500 cursor-pointer transition-colors"
         />
       </ElTooltip>
     </li>
 
+    <!-- 公众号账号（头像 + 悬浮信息卡片） -->
+    <li class="flex items-center">
+      <AccountPopover />
+    </li>
+
+    <!-- 退出应用（返回登录页） -->
+    <li class="flex items-center">
+      <ElTooltip content="退出应用">
+        <UIcon
+          name="i-heroicons:arrow-left-start-on-rectangle"
+          class="size-7 text-zinc-400 hover:text-blue-500 cursor-pointer transition-colors"
+          @click="appLogout"
+        />
+      </ElTooltip>
+    </li>
+
   </ul>
+
+  <!-- 抽屉组件（脱离操作栏布局流，仅通过 v-model:open 控制） -->
+  <CredentialsDialog
+    v-model:open="credentialsDialogOpen"
+    v-model:state="credentialState"
+    @update:pending-count="credentialPendingCount = $event"
+  />
 </template>
