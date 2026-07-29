@@ -1,27 +1,32 @@
+/**
+ * 应用登录态检查
+ *
+ * 对接「应用门禁」(useAppAuth) 状态。
+ * 注意：本检查仅用于「应用是否已通过门禁」。
+ * 微信公众号扫码登录态是独立的子功能（见 components/modal/Login.vue、SessionExpiredBanner），
+ * 不在此处判断。
+ *
+ * 由于应用门禁已由全局路由守卫 + 服务端中间件统一保障，
+ * 能进入 dashboard 的用户必然已通过门禁，故此处主要用于操作前的本地状态确认，
+ * 失败时引导到门禁页 /signin。
+ */
+
+import { useAppAuth } from '~/composables/useAppAuth';
+
 export default () => {
   const router = useRouter();
+  const { state, checkStatus } = useAppAuth();
 
-  // 检查应用登录状态
-  async function checkAppLogin(): Promise<boolean> {
-    try {
-      const response = await $fetch('/api/auth/status');
-      return response.success || response.authenticated || false;
-    } catch {
-      return false;
-    }
-  }
-
-  // 检查是否有登录信息
   async function checkLogin(): Promise<boolean> {
-    // 只检查应用登录状态（auth-key cookie）
-    const isLoggedIn = await checkAppLogin();
-
-    if (!isLoggedIn) {
-      // 未登录应用，跳转到登录页
-      await router.push('/login');
-      return false;
+    // 状态尚未确认时，先查询一次
+    if (state.value.loading) {
+      await checkStatus();
     }
 
+    if (!state.value.authenticated) {
+      await router.push('/signin');
+      return false;
+    }
     return true;
   }
 

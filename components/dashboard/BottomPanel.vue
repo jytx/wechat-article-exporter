@@ -16,6 +16,8 @@ const emit = defineEmits<{
 
 const loginAccount = useLoginAccount();
 const modal = useDialog();
+// 退出应用门禁（区别于退出微信公众号的 logout）
+const { logout: appLogout } = useAppAuth();
 
 const now = ref(new Date());
 const distance = computed(() => {
@@ -165,18 +167,28 @@ onUnmounted(() => {
       <!-- 未登录 -->
       <template v-else>
         <div
-          class="overflow-hidden transition-all duration-300 ease-out"
-          :style="collapsed ? { opacity: 0, maxWidth: '0' } : { opacity: 1, maxWidth: '200px' }"
+          class="overflow-hidden flex items-center transition-all duration-300 ease-out"
+          :style="collapsed ? { opacity: 0, maxWidth: '0' } : { opacity: 1, maxWidth: '260px', flex: '1 1 auto' }"
         >
           <ElButton @click="login">登录公众号</ElButton>
+          <ElButton class="ml-2" @click="appLogout">退出应用</ElButton>
         </div>
-        <button
-          v-if="collapsed"
-          class="flex items-center justify-center size-9 rounded-md bg-black/5 hover:bg-black/10 transition-colors"
-          @click="login"
-        >
-          <UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" class="size-[18px] text-gray-500" />
-        </button>
+        <div v-if="collapsed" class="flex flex-col gap-2">
+          <button
+            class="flex items-center justify-center size-9 rounded-md bg-black/5 hover:bg-black/10 transition-colors"
+            @click="login"
+          >
+            <UIcon name="i-heroicons-arrow-left-start-on-rectangle-16-solid" class="size-[18px] text-gray-500" />
+          </button>
+          <ElTooltip content="退出应用" placement="right">
+            <button
+              class="flex items-center justify-center size-8 rounded-md text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+              @click="appLogout"
+            >
+              <UIcon name="i-heroicons-arrow-right-start-on-rectangle-20-solid" class="size-[18px]" />
+            </button>
+          </ElTooltip>
+        </div>
       </template>
     </div>
 

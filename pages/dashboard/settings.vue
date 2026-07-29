@@ -30,6 +30,9 @@
 
           <!-- 其他设置 -->
           <SettingMisc />
+
+          <!-- 安全（修改门禁密码） -->
+          <SettingSecurity />
         </div>
       </div>
     </div>
