@@ -1,8 +1,12 @@
 <template>
   <ElCard>
     <template #header>
-      <h3 class="text-2xl font-semibold">导出选项</h3>
-      <p class="text-sm text-slate-10 font-serif">配置文章的导出选项</p>
+      <BaseSettingCardHeader
+        icon="i-lucide:download"
+        icon-color="#ff6b00"
+        title="导出选项"
+        description="配置文章的导出目录、路径与内容包含项"
+      />
     </template>
 
     <div class="flex flex-col space-y-5">

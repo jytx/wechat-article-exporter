@@ -69,10 +69,12 @@ async function handleSubmit(): Promise<void> {
 <template>
   <ElCard>
     <template #header>
-      <h3 class="text-2xl font-semibold">安全</h3>
-      <p class="text-sm text-slate-10">
-        修改应用的访问密码。修改后，其他设备的登录将自动失效，需要重新登录。
-      </p>
+      <BaseSettingCardHeader
+        icon="i-lucide:shield-check"
+        icon-color="#ff3b30"
+        title="安全"
+        description="修改应用的访问密码。修改后，其他设备的登录将自动失效"
+      />
     </template>
 
     <div class="max-w-[480px] space-y-5">

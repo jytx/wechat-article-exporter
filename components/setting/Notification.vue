@@ -1,8 +1,12 @@
 <template>
   <ElCard>
     <template #header>
-      <h3 class="text-2xl font-semibold">消息通知</h3>
-      <p class="text-sm text-slate-10 font-serif">配置邮箱与 Webhook，在同步完成、登录过期等事件时接收通知</p>
+      <BaseSettingCardHeader
+        icon="i-lucide:bell"
+        icon-color="#ff9f0a"
+        title="消息通知"
+        description="配置邮箱与 Webhook，在同步完成、登录过期等事件时接收通知"
+      />
     </template>
 
     <div class="flex flex-col space-y-6">

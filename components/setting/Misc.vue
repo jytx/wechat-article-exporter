@@ -1,7 +1,12 @@
 <template>
   <ElCard>
     <template #header>
-      <h3 class="text-2xl font-semibold">其他</h3>
+      <BaseSettingCardHeader
+        icon="i-lucide:settings-2"
+        icon-color="#6e6e73"
+        title="其他设置"
+        description="文章显示、下载与抓取的杂项开关"
+      />
     </template>
 
     <div class="flex flex-col space-y-5">

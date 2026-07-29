@@ -1,17 +1,23 @@
 <template>
   <ElCard>
     <template #header>
-      <h3 class="text-2xl font-semibold">代理节点</h3>
-      <p class="text-sm text-slate-10 font-serif">
-        若此处留空，则网站将使用
-        <ExternalLink :href="docsWebSite + '/get-started/proxy.html'" text="公共代理" /> 进行资源下载。
-      </p>
-      <p>
-        <ExternalLink :href="docsWebSite + '/get-started/private-proxy.html'" text="如何搭建代理节点？" />
-      </p>
+      <BaseSettingCardHeader
+        icon="i-lucide:globe"
+        icon-color="#0071e3"
+        title="代理节点"
+        description="配置私有代理地址，留空则使用公共代理"
+      />
     </template>
 
-    <div class="flex space-x-10">
+    <div>
+      <!-- 文档链接提示 -->
+      <div class="mb-5 text-sm" style="color: var(--text-2)">
+        若此处留空，则网站将使用
+        <ExternalLink :href="docsWebSite + '/get-started/proxy.html'" text="公共代理" /> 进行资源下载。
+        <ExternalLink :href="docsWebSite + '/get-started/private-proxy.html'" text="如何搭建代理节点？" />
+      </div>
+
+      <div class="flex space-x-10">
       <textarea
         class="h-[400px] flex-1 p-2 border rounded resize-none font-mono"
         v-model="textareaValue"
@@ -38,6 +44,7 @@
           <label class="block text-sm mb-1">代理认证密钥（可选）</label>
           <ElInput v-model="authorizationValue" style="width: 400px" class="font-mono" placeholder="若代理需要鉴权才填，如 deno deploy 的 token" />
         </div>
+      </div>
       </div>
     </div>
   </ElCard>

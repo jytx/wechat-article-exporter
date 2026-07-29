@@ -1,8 +1,12 @@
 <template>
   <ElCard>
     <template #header>
-      <h3 class="text-2xl font-semibold">文章同步</h3>
-      <p class="text-sm text-slate-10 font-serif">公众号文章的同步频率与定时任务配置</p>
+      <BaseSettingCardHeader
+        icon="i-lucide:refresh-cw"
+        icon-color="#30d158"
+        title="文章同步"
+        description="公众号文章的同步频率与定时任务配置"
+      />
     </template>
 
     <div class="flex flex-col space-y-6">

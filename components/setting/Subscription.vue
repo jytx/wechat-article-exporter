@@ -1,8 +1,12 @@
 <template>
   <ElCard>
     <template #header>
-      <h3 class="text-2xl font-semibold">文章订阅</h3>
-      <p class="text-sm text-slate-10 font-serif">定时将最新同步的公众号文章通过邮件/Webhook 推送给你</p>
+      <BaseSettingCardHeader
+        icon="i-lucide:newspaper"
+        icon-color="#bf5af2"
+        title="文章订阅"
+        description="定时将最新同步的公众号文章通过邮件/Webhook 推送给你"
+      />
     </template>
 
     <div class="flex flex-col space-y-6">
