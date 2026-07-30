@@ -111,6 +111,11 @@ function formatSyncCompleteMessage(newSynced: number, dbCount: number, wxTotal: 
 let isRunningTask = false;
 const taskQueue: Array<() => Promise<void>> = [];
 
+// 频率限制熔断标志：一旦某个任务因 freq control 失败，队列里剩余任务自动跳过
+// 避免批量同步时十几个账号每个都傻等 21 秒重试（总共卡十几分钟）
+// 下次发起新同步任务时自动重置（给用户重试的机会）
+let freqControlTripped = false;
+
 /**
  * 将任务加入队列，串行执行
  */
@@ -184,6 +189,10 @@ export function startSyncTask(params: {
 
   tasks.set(taskId, task);
 
+  // 新任务入队时重置频率限制熔断标志（给用户重试的机会）
+  // 这样用户再次点同步时，不会因为上一次限流而直接跳过
+  freqControlTripped = false;
+
   // 加入串行队列，fire-and-forget
   void enqueueTask(async () => {
     const t = tasks.get(taskId);
@@ -194,6 +203,16 @@ export function startSyncTask(params: {
       t.finishedAt = Date.now();
       t.updatedAt = Date.now();
       log.info(`[sync-task ${taskId}] 任务在排队阶段被取消，跳过执行`);
+      return;
+    }
+    // 频率限制熔断：前面的任务已触发限流，本任务直接跳过，避免傻等重试
+    if (freqControlTripped) {
+      t.status = 'failed';
+      t.error = 'freq control';
+      t.message = '已被微信限流，请等待几小时后再试';
+      t.finishedAt = Date.now();
+      t.updatedAt = Date.now();
+      log.info(`[sync-task ${taskId}] 因频率限制熔断，跳过执行`);
       return;
     }
     // 任务开始执行时，状态从 pending 改为 running
@@ -289,6 +308,8 @@ async function runSyncLoop(
         // 频率限制（200013）：重试已耗尽，标记为限流，完成时给明确提示而非"同步完成"
         if (result.code === 200013) {
           freqLimited = true;
+          // 触发熔断：让队列里剩余的 pending 任务直接跳过，避免批量同步时逐个傻等重试
+          freqControlTripped = true;
         }
         task.message = freqLimited
           ? `已被微信限流（freq control），请等待几小时后再试`
@@ -444,6 +465,11 @@ async function runSyncLoop(
     : formatSyncCompleteMessage(totalSynced, countRow.count, totalCount);
   task.finishedAt = Date.now();
   task.updatedAt = Date.now();
+
+  // 非限流的正常完成：清除熔断标志（限流可能只是暂时的，后续任务恢复正常）
+  if (!freqLimited) {
+    freqControlTripped = false;
+  }
 
   if (freqLimited) {
     task.error = 'freq control';
