@@ -28,6 +28,9 @@ useHead({
   title: `文章下载 | ${websiteName}`,
 });
 
+// 全局消息提示（页面级共享，供所有函数使用）
+const toast = toastFactory();
+
 // 当前页面的数据模型
 interface Article extends AppMsgExWithFakeID, Partial<ArticleMetadata> {
   /**
@@ -153,26 +156,28 @@ async function addAccountToManage(row: any) {
     return;
   }
   try {
-    await $fetch('/api/web/data/v1/batch/save-searched-article', {
-      method: 'POST',
-      body: {
-        article: null,
-        account: {
-          fakeid: row.fakeid,
-          nickname: row.account_nickname || row.author || '未知公众号',
-          round_head_img: row.cover || '',
-        },
-      },
-      credentials: 'include',
+    // 直接调用公众号创建接口（语义匹配：只加公众号，不涉及文章入库）
+    const nickname = row.account_nickname || row.author || '未知公众号';
+    await accountApi.createAccount({
+      fakeid: row.fakeid,
+      nickname,
+      round_head_img: row.cover || '',
     });
     managedFakeids.value.add(row.fakeid);
-    toast.success('已添加', '公众号已加入管理列表');
+    toast.success('已加入管理', `「${nickname}」已加入公众号管理列表`);
     // 若当前处于「未管理」视图，加入管理后该文章不再属于未管理，刷新列表使其消失
     if (selectedAccount.value?.fakeid === '__unmanaged__') {
       refresh();
     }
   } catch (e: any) {
-    toast.error('添加失败', e?.data?.message || e?.message || '添加失败');
+    // 公众号已存在时（ACCOUNT_ALREADY_EXISTS）视为成功
+    const msg = e?.message || '';
+    if (msg.includes('已存在')) {
+      managedFakeids.value.add(row.fakeid);
+      toast.info('提示', '该公众号已在管理列表中');
+    } else {
+      toast.error('添加失败', msg || '添加失败');
+    }
   }
 }
 
@@ -549,7 +554,6 @@ const selectedExportFormat = ref<(typeof exportFormats)[number]['value']>('markd
 
 // 执行导出
 async function executeExport() {
-  const toast = toastFactory();
   const preferences = usePreferences();
   const exportPath = preferences.value.exportConfig.exportPath;
 
@@ -659,9 +663,6 @@ function copyArticleLink(row: Article): void {
 
 <template>
   <div class="h-full">
-    <Teleport defer to="#title">
-      <h1 class="text-[28px] leading-[34px] text-slate-12 dark:text-slate-50 font-bold">文章下载</h1>
-    </Teleport>
 
     <div class="flex flex-col h-full divide-y divide-gray-200">
       <!-- 顶部筛选与操作区 -->

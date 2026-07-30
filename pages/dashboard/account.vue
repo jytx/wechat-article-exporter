@@ -238,7 +238,12 @@
 				if (task.error === 'session expired') {
 				  modal.open(LoginModal);
 				}
-				toast.error('同步失败', `${task.nickname}: ${task.message}`);
+				// 频率限制用 warning（需等待冷却而非操作错误），其余用 error
+				if (task.error === 'freq control') {
+				  toast.warning('被微信限流', `${task.nickname}: ${task.message}`);
+				} else {
+				  toast.error('同步失败', `${task.nickname}: ${task.message}`);
+				}
 			  } else {
 				// 取消导致的完成（非用户主动期望的"同步成功"），用 info 而非 success
 				if (task.message?.includes('手动停止') || task.message?.includes('未开始')) {
@@ -634,9 +639,6 @@
 
 	<template>
 	  <div class="h-full">
-	    <Teleport defer to="#title">
-	      <h1 class="text-[28px] leading-[34px] text-slate-12 dark:text-slate-50 font-bold">公众号管理</h1>
-	    </Teleport>
 
 	    <div class="flex flex-col h-full divide-y divide-gray-200">
 	      <!-- 顶部操作区 -->

@@ -13,6 +13,7 @@ import { cookieStore } from '~/server/utils/CookieStore';
 import { saveArticles } from '~/server/database/article';
 import { getAccount, updateAccountSyncedCount, updateAccountTotalCount } from '~/server/database/account';
 import { log } from '~/server/utils/log';
+import { fetchPublishPageWithRetry } from '~/server/utils/wx-publish-api';
 
 export interface SyncTask {
   id: string;
@@ -230,6 +231,8 @@ async function runSyncLoop(
   let hasMore = true;
   let noNewStreak = 0; // 连续无新增文章的页数（增量同步停止条件）
   let consecutiveErrors = 0; // 连续出错次数（超时/网络异常等），超过阈值则终止任务避免卡死队列
+  // 频率限制标记：当请求层重试耗尽后置为 true，完成时据此把任务标记为失败并给出明确提示
+  let freqLimited = false;
 
   // 从 CookieStore 获取 token 和 cookie（用 authKey，不依赖 event）
   const token = await cookieStore.getToken(authKey);
@@ -259,96 +262,52 @@ async function runSyncLoop(
     }
 
     try {
-      const urlParams = new URLSearchParams({
-        sub: 'list',
-        search_field: 'null',
-        begin: String(begin),
-        count: String(pageSize),
+      // 拉取一页（内部已对频率限制做指数退避重试，session 过期/其他错误直接返回）
+      const result = await fetchPublishPageWithRetry({
         fakeid,
-        type: '101_1',
-        free_publish_type: '1',
-        sub_action: 'list_ex',
+        begin,
+        pageSize,
         token,
-        lang: 'zh_CN',
-        f: 'json',
-        ajax: '1',
+        cookie: cookie || '',
+        logTag: `sync-task ${taskId}`,
       });
 
-      const resp = await fetch(`https://mp.weixin.qq.com/cgi-bin/appmsgpublish?${urlParams}`, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Referer: 'https://mp.weixin.qq.com/',
-          Origin: 'https://mp.weixin.qq.com',
-          cookie: cookie || '',
-        },
-        // 超时保护：微信接口偶尔会挂起不响应，不加超时会导致整个任务永久卡死，
-        // 串行队列里后续任务全部饿死（曾出现某公众号卡 16 分钟、后面 8 个公众号全显示"同步中"）。
-        signal: AbortSignal.timeout(30_000),
-      });
-      const wxData = await resp.json();
-
-      // session 过期
-      if (wxData.base_resp?.ret === 200003) {
-        task.status = 'failed';
-        task.error = 'session expired';
-        task.message = `同步了 ${totalSynced} 篇后 session 过期`;
-        task.synced = totalSynced;
-        task.finishedAt = Date.now();
-        task.updatedAt = Date.now();
-        log.error(`[sync-task ${taskId}] session 过期`);
-        return;
-      }
-
-      if (wxData.base_resp?.ret !== 0) {
-        log.error(`[sync-task ${taskId}] 微信返回错误:`, wxData.base_resp);
+      if (!result.ok) {
+        // session 过期：终止任务
+        if (result.sessionExpired) {
+          task.status = 'failed';
+          task.error = 'session expired';
+          task.message = `同步了 ${totalSynced} 篇后 session 过期`;
+          task.synced = totalSynced;
+          task.finishedAt = Date.now();
+          task.updatedAt = Date.now();
+          log.error(`[sync-task ${taskId}] session 过期`);
+          return;
+        }
+        // 其他业务错误：终止本页循环
+        log.error(`[sync-task ${taskId}] 微信返回错误: ${result.errMsg} (code=${result.code})`);
+        // 频率限制（200013）：重试已耗尽，标记为限流，完成时给明确提示而非"同步完成"
+        if (result.code === 200013) {
+          freqLimited = true;
+        }
+        task.message = freqLimited
+          ? `已被微信限流（freq control），请等待几小时后再试`
+          : `同步中断：${result.errMsg}`;
         break;
       }
 
-      const publishPage = wxData.publish_page ? JSON.parse(wxData.publish_page) : null;
-      if (!publishPage) {
-        log.info(`[sync-task ${taskId}] 第 ${page + 1} 页无 publish_page，结束`);
-        break;
-      }
-
-      totalCount = publishPage.total_count || totalCount;
+      totalCount = result.page.totalCount || totalCount;
       task.totalWx = totalCount;
 
-      let publishList = publishPage.publish_list || [];
+      let publishList = result.page.publishList;
       if (publishList.length === 0) {
-        // 微信偶尔会返回空列表（即使 hasMore=true，total_count 显示还有更多）
-        // 这通常是接口分页不稳定或限流，等待后重试一次再决定是否结束
+        // 微信偶尔会返回空列表（即使 total_count 显示还有更多）。
+        // 通常 total_count <= begin 时表示确实到底了；否则按"正常结束"处理（重试已在请求层做过）。
         if (totalCount > begin) {
-          log.info(`[sync-task ${taskId}] 第 ${page + 1} 页返回空列表但 total_count=${totalCount} > begin=${begin}，5秒后重试...`);
-          await sleep(5000);
-          const retryParams = new URLSearchParams({
-            sub: 'list', search_field: 'null', begin: String(begin), count: String(pageSize),
-            fakeid, type: '101_1', free_publish_type: '1', sub_action: 'list_ex',
-            token, lang: 'zh_CN', f: 'json', ajax: '1',
-          });
-          const retryResp = await fetch(`https://mp.weixin.qq.com/cgi-bin/appmsgpublish?${retryParams}`, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              Referer: 'https://mp.weixin.qq.com/', Origin: 'https://mp.weixin.qq.com', cookie: cookie || '',
-            },
-            signal: AbortSignal.timeout(30_000),
-          });
-          const retryData = await retryResp.json();
-          const retryPage = retryData.publish_page ? JSON.parse(retryData.publish_page) : null;
-          publishList = retryPage?.publish_list || [];
-          totalCount = retryPage?.total_count || totalCount;
-          task.totalWx = totalCount;
-          if (publishList.length > 0) {
-            log.info(`[sync-task ${taskId}] 重试成功，拿到 ${publishList.length} 条`);
-          } else {
-            log.info(`[sync-task ${taskId}] 重试仍为空，确认结束`);
-            hasMore = false;
-            break;
-          }
-        } else {
-          hasMore = false;
-          break;
+          log.info(`[sync-task ${taskId}] 第 ${page + 1} 页返回空列表但 total_count=${totalCount} > begin=${begin}，按结束处理`);
         }
+        hasMore = false;
+        break;
       }
 
       // 解析文章（只取主条 itemidx=1，与原客户端逻辑一致）
@@ -475,14 +434,20 @@ async function runSyncLoop(
   await updateAccountTotalCount(fakeid, actualCount);
   await updateAccountSyncedCount(fakeid, actualCount);
 
-  // 标记完成
-  task.status = 'completed';
+  // 标记完成（频率限制导致的结束标记为 failed，让前端给出明确提示而非"同步完成"）
+  task.status = freqLimited ? 'failed' : 'completed';
   task.synced = totalSynced;
   task.totalWx = totalCount;
   task.dbCount = countRow.count;
-  task.message = formatSyncCompleteMessage(totalSynced, countRow.count, totalCount);
+  task.message = freqLimited
+    ? `已被微信限流，请等待几小时后再试（本次新增 ${totalSynced} 篇）`
+    : formatSyncCompleteMessage(totalSynced, countRow.count, totalCount);
   task.finishedAt = Date.now();
   task.updatedAt = Date.now();
 
-  log.info(`[sync-task ${taskId}] 同步完成 ${fakeid}：新增 ${totalSynced}，共 ${countRow.count}/${totalCount}`);
+  if (freqLimited) {
+    task.error = 'freq control';
+  }
+
+  log.info(`[sync-task ${taskId}] 同步${freqLimited ? '被限流' : '完成'} ${fakeid}：新增 ${totalSynced}，共 ${countRow.count}/${totalCount}`);
 }

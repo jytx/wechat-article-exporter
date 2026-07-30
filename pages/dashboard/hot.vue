@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Flame, TrendingUp } from 'lucide-vue-next';
+import { TrendingUp } from 'lucide-vue-next';
 import { formatTimeStamp } from '#shared/utils/helpers';
 import { websiteName } from '~/config';
 import { useAccountApi, type Account } from '~/composables/useAccountApi';
@@ -172,13 +172,6 @@ onMounted(async () => {
   <div class="flex flex-col h-full">
     <!-- 工具栏 -->
     <div class="flex flex-wrap items-center gap-3 p-3 border-b border-gray-200 dark:border-gray-800">
-      <div class="flex items-center gap-2">
-        <Flame :size="20" class="text-orange-500" />
-        <h1 class="text-lg font-semibold">选题雷达</h1>
-      </div>
-
-      <div class="flex-1" />
-
       <!-- 搜索框 -->
       <ElInput
         v-model="searchKeyword"
