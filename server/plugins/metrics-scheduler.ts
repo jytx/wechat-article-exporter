@@ -72,8 +72,9 @@ function parseScheduleConfig(): { enabled: boolean; cron: string } {
 
 /**
  * 从 cookies 表获取最新的 authKey
+ * 导出供 session-probe-scheduler 复用（DRY）。
  */
-function getLatestAuthKey(): string | null {
+export function getLatestAuthKey(): string | null {
   try {
     const db = getDatabase();
     const row = db
@@ -92,9 +93,11 @@ export const SESSION_EXPIRED_KEY = 'mp_session_expired_at';
  * 轻量预检：用最新 authKey 请求一次微信接口，判断 session 是否有效。
  * 纯函数 —— 只读不写副作用，由调用方决定如何持久化结果。
  *
+ * 导出供 session-probe-scheduler 复用，避免重复实现探活逻辑（DRY）。
+ *
  * @returns valid=true 表示 session 有效；valid=false 表示过期或无法验证
  */
-async function checkSessionValid(authKey: string): Promise<{ valid: boolean; reason: string }> {
+export async function checkSessionValid(authKey: string): Promise<{ valid: boolean; reason: string }> {
   const token = await cookieStore.getToken(authKey);
   const cookie = await cookieStore.getCookie(authKey);
   if (!token || !cookie) {

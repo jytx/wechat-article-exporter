@@ -1,8 +1,5 @@
 <template>
   <div class="flex flex-col h-full">
-    <Teleport defer to="#title">
-      <h1 class="text-[28px] leading-[34px] text-slate-12 font-bold">技术支持 & 赞助</h1>
-    </Teleport>
     <div class="px-6 py-4 flex-1 overflow-scroll">
       <p class="text-rose-500 text-3xl mb-10 font-medium">
         特别提示：<br />

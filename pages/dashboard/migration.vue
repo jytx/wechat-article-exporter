@@ -185,9 +185,6 @@
 
 <template>
   <div class="h-full">
-    <Teleport defer to="#title">
-      <h1 class="text-[28px] leading-[34px] text-slate-12 dark:text-slate-50 font-bold">数据迁移</h1>
-    </Teleport>
 
     <div class="max-w-6xl mx-auto p-6">
       <!-- 说明区域 -->

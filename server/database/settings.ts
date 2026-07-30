@@ -61,6 +61,16 @@ const DEFAULT_SETTINGS: SettingItem[] = [
       timeField: 'create_time', // 默认按文章发布时间
     }),
   },
+  // —— 登录态探活调度 ——
+  // 默认启用：是否真正发通知由通知配置（notification_config）决定，
+  // 调度器开启本身不会误发（notify 内部按事件勾选与渠道开关判断）。
+  {
+    key: 'session_probe_schedule',
+    value: JSON.stringify({
+      enabled: true,
+      cron: '0 * * * *', // 默认每小时整点探活一次
+    }),
+  },
 ];
 
 /**

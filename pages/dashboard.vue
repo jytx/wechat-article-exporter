@@ -6,7 +6,7 @@
     <div class="flex flex-col flex-1 overflow-hidden h-screen">
       <!-- 顶部操作栏（毛玻璃） -->
       <div
-        class="glass-nav flex h-[60px] flex-shrink-0 items-center justify-between px-6"
+        class="glass-nav flex h-[50px] flex-shrink-0 items-center justify-between px-6"
       >
         <div id="title"></div>
         <GlobalActions />

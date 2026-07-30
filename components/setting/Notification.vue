@@ -18,6 +18,33 @@
           <p class="text-sm text-slate-500 mb-1">通知事件（勾选后，对应事件发生时推送通知）</p>
           <ElCheckbox v-model="config.events.syncComplete" name="evSync">定时同步完成</ElCheckbox>
           <ElCheckbox v-model="config.events.sessionExpired" name="evSession">登录态过期</ElCheckbox>
+
+          <!-- 登录态过期探活频率配置：仅在勾选「登录态过期」时展开 -->
+          <div v-if="config.events.sessionExpired" class="pl-6 border-l-2 border-slate-200 dark:border-slate-700 flex flex-col gap-2 py-1">
+            <p class="text-xs text-slate-500">探活频率：系统按此间隔主动检查公众号登录态，过期时推送一次提醒</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <ElCheckbox v-model="probeSchedule.enabled" name="probeEnabled">启用定时探活</ElCheckbox>
+              <ElInput
+                v-model="probeSchedule.cron"
+                placeholder="0 * * * *"
+                class="font-mono"
+                style="width: 180px"
+              />
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs text-slate-400">快捷预设：</span>
+              <ElButton
+                v-for="preset in PROBE_PRESETS"
+                :key="preset.cron"
+                size="small"
+                link
+                :type="probeSchedule.cron === preset.cron ? 'primary' : ''"
+                @click="probeSchedule.cron = preset.cron"
+              >
+                {{ preset.label }}
+              </ElButton>
+            </div>
+          </div>
           <ElCheckbox v-model="config.events.syncFailed" name="evFailed">同步失败告警</ElCheckbox>
           <ElCheckbox v-model="config.events.articleDigest" name="evDigest">文章订阅推送</ElCheckbox>
         </div>
@@ -129,6 +156,16 @@ const WEBHOOK_OPTIONS: ReadonlyArray<{ value: WebhookType; label: string }> = [
 /** 通知配置（组件自管，与 preferences 解耦） */
 const config = reactive<NotificationConfig>(createDefaultNotificationConfig());
 
+/** 登录态探活调度配置（独立于通知配置，单独存于 session_probe_schedule） */
+const probeSchedule = reactive({ enabled: true, cron: '0 * * * *' });
+
+/** 探活频率快捷预设 */
+const PROBE_PRESETS: ReadonlyArray<{ cron: string; label: string }> = [
+  { cron: '*/30 * * * *', label: '每 30 分钟' },
+  { cron: '0 * * * *', label: '每小时' },
+  { cron: '0 */6 * * *', label: '每 6 小时' },
+];
+
 /** 暴露给父组件 saveAll 调用的保存函数 */
 const saving = ref(false);
 async function save() {
@@ -158,6 +195,27 @@ watch(config, () => {
   _autoSaveTimer = setTimeout(() => save(), 800);
 }, { deep: true });
 
+// ========== 探活配置自动保存 ==========
+
+let _probeSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let _probeLoaded = false;
+async function saveProbeSchedule() {
+  try {
+    await $fetch('/api/web/data/v1/batch/session-probe', {
+      method: 'PUT',
+      body: { enabled: probeSchedule.enabled, cron: probeSchedule.cron },
+    });
+  } catch (e: any) {
+    toast.error('探活配置保存失败', e?.data?.message || e?.message || '未知错误');
+  }
+}
+watch(probeSchedule, () => {
+  // 跳过首次加载时的触发
+  if (!_probeLoaded) return;
+  if (_probeSaveTimer) clearTimeout(_probeSaveTimer);
+  _probeSaveTimer = setTimeout(() => saveProbeSchedule(), 800);
+}, { deep: true });
+
 // ========== 加载配置 ==========
 
 async function loadConfig() {
@@ -180,6 +238,23 @@ async function loadConfig() {
   } finally {
     // 标记加载完成，之后 config 变化才触发自动保存
     _configLoaded = true;
+  }
+
+  // 加载探活配置（与通知配置并行，互不阻塞）
+  try {
+    const resp = await $fetch<{ success: boolean; data: { key: string; value: string } }>(
+      '/api/web/data/v1/settings',
+      { query: { key: 'session_probe_schedule' } },
+    );
+    if (resp?.success && resp.data?.value) {
+      const parsed = JSON.parse(resp.data.value) as { enabled?: boolean; cron?: string };
+      probeSchedule.enabled = parsed.enabled !== false;
+      if (typeof parsed.cron === 'string' && parsed.cron.trim()) probeSchedule.cron = parsed.cron.trim();
+    }
+  } catch {
+    // 静默失败，使用默认值
+  } finally {
+    _probeLoaded = true;
   }
 }
 

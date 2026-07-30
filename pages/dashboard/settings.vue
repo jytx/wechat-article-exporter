@@ -37,9 +37,6 @@ const activeKey = ref<string>('proxy');
 
 <template>
   <div class="h-full">
-    <Teleport defer to="#title">
-      <h1 class="text-[28px] leading-[34px] font-bold" style="color: var(--text)">设置</h1>
-    </Teleport>
 
     <div class="flex h-full overflow-hidden">
       <!-- 左侧分类导航 -->

@@ -1,8 +1,5 @@
 <template>
   <div class="h-full">
-    <Teleport defer to="#title">
-      <h1 class="text-[28px] leading-[34px] text-slate-12 dark:text-slate-50 font-bold">操作日志</h1>
-    </Teleport>
 
     <div class="flex flex-col h-full">
       <!-- 顶部操作区：类型筛选 + 刷新 -->

@@ -1,8 +1,5 @@
 <template>
   <div class="h-full">
-    <Teleport defer to="#title">
-      <h1 class="text-[28px] leading-[34px] text-slate-12 dark:text-slate-50 font-bold">公共代理</h1>
-    </Teleport>
 
     <div class="flex flex-col h-full divide-y divide-gray-200">
       <!-- header -->
