@@ -1,0 +1,10 @@
+# down.mptext.top 的下线落地页：只有静态资源，没有 Worker 脚本，请求不计入 Workers 额度。
+# 自定义域在 Cloudflare 控制台绑定，这里不声明路由。
+name = "down-mptext-shutdown"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# 旧站的所有路径（/dashboard/*、/api/* 等）都返回这张页面。
+[assets]
+directory = "./public"
+not_found_handling = "single-page-application"

@@ -1,4 +1,4 @@
-# 自动部署 wechat-article-exporter 到 Cloudflare Workers（push 到 master 触发）
+# 部署 wechat-article-exporter 到 Cloudflare Workers（只能手动触发：在线网站已下线，这里只用于恢复旧站）
 #
 # 前置：在 GitHub 仓库 Settings → Secrets and variables → Actions 配置：
 #   Secrets:
@@ -17,8 +17,6 @@
 name: Deploy
 
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
 
 jobs:

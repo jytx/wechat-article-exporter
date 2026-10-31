@@ -1,0 +1,23 @@
+# 部署 down.mptext.top 的下线落地页（shutdown-page/）。只有静态资源，不需要构建。
+# 自定义域在 Cloudflare 控制台绑定，这里只发布 Worker。
+name: Deploy shutdown page
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'shutdown-page/**'
+      - '.github/workflows/shutdown-page.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: shutdown-page
+          wranglerVersion: '4.151.1'
